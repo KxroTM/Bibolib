@@ -25,6 +25,8 @@ go get github.com/xdg-go/stringprep@latest
 go get github.com/youmark/pkcs8@latest
 ```
 ```bash
+go get github.com/joho/godotenv
+```
 go mod tidy
 ```
 ```bash
