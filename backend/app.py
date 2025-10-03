@@ -11,7 +11,7 @@ db.init_app(app)
 
 @app.route("/")
 def home():
-    return {"message": "home"}
+    return {"message": "connexion reussie"}
 
 # Users Endpoints
 @app.route("/users", methods=["POST"])
