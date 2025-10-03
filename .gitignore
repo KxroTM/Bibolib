@@ -1,0 +1,27 @@
+# Fichiers Go binaires
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Dossier de build
+/bin/
+/build/
+
+# Modules et dépendances
+vendor/
+
+# Variables d’environnement
+.env
+
+# Config locales
+*.local
+*.log
+
+# IDE / éditeurs
+.vscode/
+.idea/
+*.swp

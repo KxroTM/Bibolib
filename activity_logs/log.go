@@ -3,79 +3,83 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
+	"log"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
+	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+var mongoClient *mongo.Client
 var logCollection *mongo.Collection
 
-// Modèle de log
-type ActivityLog struct {
-	UserID    int       `json:"user_id" bson:"user_id"`
-	Action    string    `json:"action" bson:"action"`
-	Target    string    `json:"target" bson:"target"`
-	Timestamp time.Time `json:"timestamp" bson:"timestamp"`
-	IP        string    `json:"ip" bson:"ip"`
-	Status    string    `json:"status" bson:"status"`
-}
-
-// Connexion Mongo
-func InitMongo() {
-	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
-	client, err := mongo.Connect(context.TODO(), clientOptions)
+func initMongo() {
+	// Charger le .env
+	err := godotenv.Load()
 	if err != nil {
-		panic(err)
-	}
-	logCollection = client.Database("mydb").Collection("activity_logs")
-}
-
-// Handler POST : insérer un log
-func createLog(c *gin.Context) {
-	var log ActivityLog
-	if err := c.ShouldBindJSON(&log); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+		log.Fatal("Erreur lors du chargement du fichier .env")
 	}
 
-	log.Timestamp = time.Now()
-	_, err := logCollection.InsertOne(context.TODO(), log)
+	// Récupérer les variables
+	uri := os.Getenv("MONGO_URI")
+	dbName := os.Getenv("MONGO_DB")
+	collectionName := os.Getenv("MONGO_COLLECTION")
+
+	// Contexte avec timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Connexion à MongoDB Atlas
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur insertion log"})
-		return
+		log.Fatal(err)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Log ajouté avec succès"})
-}
-
-// Handler GET : récupérer tous les logs
-func getLogs(c *gin.Context) {
-	cursor, err := logCollection.Find(context.TODO(), bson.M{})
+	// Vérifier la connexion
+	err = client.Ping(ctx, nil)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur récupération logs"})
-		return
-	}
-	var logs []ActivityLog
-	if err := cursor.All(context.TODO(), &logs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur décodage logs"})
-		return
+		log.Fatal("Impossible de se connecter à MongoDB : ", err)
 	}
 
-	c.JSON(http.StatusOK, logs)
+	mongoClient = client
+	logCollection = client.Database(dbName).Collection(collectionName)
+
+	fmt.Println("✅ Connexion MongoDB réussie")
 }
 
 func main() {
-	InitMongo()
+	// Init connexion DB
+	initMongo()
 
+	// Init Gin
 	r := gin.Default()
 
-	r.POST("/logs", createLog)
-	r.GET("/logs", getLogs)
+	// Exemple : endpoint qui log une action
+	r.POST("/log", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	fmt.Println("🚀 Serveur démarré sur http://localhost:8080")
+		logDoc := map[string]interface{}{
+			"user_id":   1,
+			"action":    "LOGIN",
+			"target":    "system",
+			"timestamp": time.Now(),
+			"ip":        c.ClientIP(),
+			"status":    "success",
+		}
+
+		_, err := logCollection.InsertOne(ctx, logDoc)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
+			return
+		}
+
+		c.JSON(200, gin.H{"message": "Log inséré avec succès"})
+	})
+
+	// Lancer le serveur
 	r.Run(":8080")
 }
