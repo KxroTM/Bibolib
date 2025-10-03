@@ -3,7 +3,6 @@ from models import db, create_user, get_all_users, create_bibliotheque, get_bibl
 
 app = Flask(__name__)
 
-# Config MySQL
 app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:@localhost:3306/bibolib"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -13,7 +12,6 @@ db.init_app(app)
 def home():
     return {"message": "connexion reussie"}
 
-# Users Endpoints
 @app.route("/users", methods=["POST"])
 def add_user():
     data = request.json
@@ -30,7 +28,6 @@ def list_users():
     users_list = [dict(u) for u in users]
     return jsonify(users_list)
 
-# Bibliothèques Endpoints
 @app.route("/bibliotheques", methods=["POST"])
 def add_bibliotheque():
     data = request.json
