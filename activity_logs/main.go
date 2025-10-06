@@ -59,7 +59,7 @@ func initMongo() {
 // Fonction générique pour insérer un log
 // -------------------------
 func InsertLog(ctx context.Context, userID int, username, module, action, status, ip string) error {
-	logDoc := map[string]interface{}{
+	logDoc := bson.M{
 		"user_id":   userID,
 		"username":  username,
 		"module":    module,
@@ -470,7 +470,7 @@ func main() {
 
 		// Options de tri par timestamp décroissant
 		findOptions := options.Find()
-		findOptions.SetSort(bson.D{{"timestamp", -1}})
+		findOptions.SetSort(bson.M{"timestamp": -1})
 		findOptions.SetLimit(int64(limitInt))
 		findOptions.SetSkip(int64(skip))
 
@@ -524,9 +524,9 @@ func main() {
 
 		skip := (pageInt - 1) * limitInt
 
-		filter := bson.D{{"module", module}}
+		filter := bson.M{"module": module}
 		findOptions := options.Find()
-		findOptions.SetSort(bson.D{{"timestamp", -1}})
+		findOptions.SetSort(bson.M{"timestamp": -1})
 		findOptions.SetLimit(int64(limitInt))
 		findOptions.SetSkip(int64(skip))
 
@@ -580,9 +580,9 @@ func main() {
 
 		skip := (pageInt - 1) * limitInt
 
-		filter := bson.D{{"action", action}}
+		filter := bson.M{"action": action}
 		findOptions := options.Find()
-		findOptions.SetSort(bson.D{{"timestamp", -1}})
+		findOptions.SetSort(bson.M{"timestamp": -1})
 		findOptions.SetLimit(int64(limitInt))
 		findOptions.SetSkip(int64(skip))
 
@@ -642,9 +642,9 @@ func main() {
 
 		skip := (pageInt - 1) * limitInt
 
-		filter := bson.D{{"user_id", userID}}
+		filter := bson.M{"user_id": userID}
 		findOptions := options.Find()
-		findOptions.SetSort(bson.D{{"timestamp", -1}})
+		findOptions.SetSort(bson.M{"timestamp": -1})
 		findOptions.SetLimit(int64(limitInt))
 		findOptions.SetSkip(int64(skip))
 
@@ -733,7 +733,7 @@ func main() {
 
 		// Logs des dernières 24h
 		yesterday := time.Now().Add(-24 * time.Hour)
-		last24hLogs, err := logCollection.CountDocuments(ctx, bson.D{{"timestamp", bson.D{{"$gte", yesterday}}}})
+		last24hLogs, err := logCollection.CountDocuments(ctx, bson.M{"timestamp": bson.M{"$gte": yesterday}})
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Erreur lors du comptage des logs 24h"})
 			return
@@ -819,15 +819,10 @@ func main() {
 
 		skip := (pageInt - 1) * limitInt
 
-		filter := bson.D{
-			{"timestamp", bson.D{
-				{"$gte", startDate},
-				{"$lte", endDate},
-			}},
-		}
+		filter := bson.M{"timestamp": bson.M{"$gte": startDate, "$lte": endDate}}
 
 		findOptions := options.Find()
-		findOptions.SetSort(bson.D{{"timestamp", -1}})
+		findOptions.SetSort(bson.M{"timestamp": -1})
 		findOptions.SetLimit(int64(limitInt))
 		findOptions.SetSkip(int64(skip))
 
@@ -888,17 +883,15 @@ func main() {
 		skip := (pageInt - 1) * limitInt
 
 		// Recherche dans username, action, module et ip
-		filter := bson.D{
-			{"$or", []bson.M{
-				{"username": bson.M{"$regex": query, "$options": "i"}},
-				{"action": bson.M{"$regex": query, "$options": "i"}},
-				{"module": bson.M{"$regex": query, "$options": "i"}},
-				{"ip": bson.M{"$regex": query, "$options": "i"}},
-			}},
-		}
+		filter := bson.M{"$or": []bson.M{
+			{"username": bson.M{"$regex": query, "$options": "i"}},
+			{"action": bson.M{"$regex": query, "$options": "i"}},
+			{"module": bson.M{"$regex": query, "$options": "i"}},
+			{"ip": bson.M{"$regex": query, "$options": "i"}},
+		}}
 
 		findOptions := options.Find()
-		findOptions.SetSort(bson.D{{"timestamp", -1}})
+		findOptions.SetSort(bson.M{"timestamp": -1})
 		findOptions.SetLimit(int64(limitInt))
 		findOptions.SetSkip(int64(skip))
 
