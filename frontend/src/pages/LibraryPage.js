@@ -57,7 +57,14 @@ const LibraryPage = () => {
       
       // Charger les informations de la bibliothèque
       const libraryResponse = await libraryService.getById(id);
-      setLibrary(libraryResponse.data);
+      // Normaliser les champs backend (adresse, telephone) vers ceux attendus côté front
+      const rawLib = libraryResponse.data || {};
+      const normalizedLibrary = {
+        ...rawLib,
+        address: rawLib.address || rawLib.adresse || '',
+        phone: rawLib.phone || rawLib.telephone || rawLib.telephone_number || '',
+      };
+      setLibrary(normalizedLibrary);
 
       // Charger les livres avec filtres
       const booksResponse = await libraryService.getBooks(id, {
@@ -66,10 +73,14 @@ const LibraryPage = () => {
         genre: selectedGenre,
         availability: availability
       });
-      
-      setBooks(booksResponse.data.books);
-      setFilteredBooks(booksResponse.data.books);
-      setTotalPages(booksResponse.data.totalPages);
+      // Le backend renvoie actuellement un simple tableau (pas d'objet {books:[]})
+      const rawBooks = Array.isArray(booksResponse.data)
+        ? booksResponse.data
+        : (booksResponse.data?.books || []);
+      setBooks(rawBooks);
+      setFilteredBooks(rawBooks);
+      // Fallback pagination (1 page si non fournie)
+      setTotalPages(booksResponse.data?.totalPages || 1);
 
       // Charger les genres disponibles
       const genresResponse = await libraryService.getGenres(id);
@@ -337,7 +348,7 @@ const LibraryPage = () => {
             Collection de livres
           </h2>
           <p className="text-gray-600">
-            {filteredBooks.length} livre{filteredBooks.length > 1 ? 's' : ''}
+            {(filteredBooks || []).length} livre{(filteredBooks || []).length > 1 ? 's' : ''}
           </p>
         </div>
 
@@ -346,7 +357,7 @@ const LibraryPage = () => {
             <Loader size="large" />
             <p className="mt-4 text-gray-600">Recherche en cours...</p>
           </div>
-        ) : filteredBooks.length > 0 ? (
+  ) : (filteredBooks || []).length > 0 ? (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredBooks.map((book) => (

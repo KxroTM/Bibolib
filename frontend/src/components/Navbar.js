@@ -28,11 +28,11 @@ const Navbar = () => {
           {/* Center: Quick nav links (visible on md+) */}
           <div className="flex-1 flex justify-center">
             <div className="hidden md:flex items-center space-x-4">
-              <Link to="/books" className="px-3 py-1 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors flex items-center space-x-2">
+              <Link to="/livres" className="px-3 py-1 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors flex items-center space-x-2">
                 <span className="text-sm font-medium">📖</span>
                 <span className="text-sm">Livres</span>
               </Link>
-              <Link to="/libraries" className="px-3 py-1 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors flex items-center space-x-2">
+              <Link to="/bibliotheques" className="px-3 py-1 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors flex items-center space-x-2">
                 <span className="text-sm font-medium">🏛️</span>
                 <span className="text-sm">Bibliothèques</span>
               </Link>
@@ -44,7 +44,10 @@ const Navbar = () => {
             {user ? (
               <>
                 <span className="text-gray-600">
-                  Bonjour, {user.name}
+                  {(() => {
+                    const base = user.username || user.name || (user.email ? user.email.split('@')[0] : '');
+                    return base ? `Bonjour, ${base}` : 'Bonjour';
+                  })()}
                   {isAdmin() && <span className="ml-2 px-2 py-1 text-xs bg-primary-100 text-primary-800 rounded-full">Admin</span>}
                 </span>
                 {isAdmin() && (

@@ -29,11 +29,11 @@ const LibrariesPage = () => {
       const response = await libraryService.getAll({
         page: currentPage,
         limit: itemsPerPage,
-        arrondissement: selectedArrondissement
+        arrondissement: selectedArrondissement || undefined
       });
-      
-      setLibraries(response.data.libraries);
-      setTotalPages(response.data.totalPages);
+      const { libraries: libs, totalPages: tp } = response.data;
+      setLibraries(libs);
+      setTotalPages(tp);
     } catch (error) {
       console.error('Erreur lors du chargement des bibliothèques:', error);
       toast.error('Erreur lors du chargement des bibliothèques');
@@ -110,7 +110,7 @@ const LibrariesPage = () => {
             {selectedArrondissement ? `Bibliothèques du ${selectedArrondissement}` : 'Toutes les bibliothèques'}
           </h2>
           <p className="text-gray-600">
-            {libraries.length} bibliothèque{libraries.length > 1 ? 's' : ''} trouvée{libraries.length > 1 ? 's' : ''}
+            {libraries.length} bibliothèque{libraries.length > 1 ? 's' : ''} affichée{libraries.length > 1 ? 's' : ''}
           </p>
         </div>
 

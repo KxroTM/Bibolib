@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 const BookCard = ({ book, showLibrary = false }) => {
   return (
-    <Link to={`/book/${book.id}`}>
+  <Link to={`/livre/${book.id}`}>
       <div className="card overflow-hidden animate-slide-up">
         <div className="relative">
           {book.coverImage ? (

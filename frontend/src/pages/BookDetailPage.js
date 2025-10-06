@@ -168,7 +168,7 @@ const BookDetailPage = () => {
         <span className="mx-2">›</span>
         {library && (
           <>
-            <Link to={`/library/${library.id}`} className="hover:text-primary-600">
+            <Link to={`/bibliotheque/${library.id}`} className="hover:text-primary-600">
               {library.name}
             </Link>
             <span className="mx-2">›</span>
@@ -313,7 +313,7 @@ const BookDetailPage = () => {
                   <p className="text-gray-600 text-sm">🏛️ {library.arrondissement} arrondissement</p>
                 </div>
                 <Link
-                  to={`/library/${library.id}`}
+                  to={`/bibliotheque/${library.id}`}
                   className="inline-flex items-center mt-4 text-primary-600 hover:text-primary-700 font-medium text-sm"
                 >
                   Voir tous les livres de cette bibliothèque →

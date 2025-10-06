@@ -60,7 +60,7 @@ const NewBooksCarousel = ({ books = [], autoInterval = 4000 }) => {
       <div className="absolute inset-0 bg-black bg-opacity-50"></div>
 
       {/* Content - clickable area links to book detail */}
-      <Link to={`/book/${book.id || ''}`} aria-label={`Voir ${book.title}`} className="relative z-10 container mx-auto px-4 py-8 block">
+  <Link to={`/livre/${book.id || ''}`} aria-label={`Voir ${book.title}`} className="relative z-10 container mx-auto px-4 py-8 block">
         <div className="flex items-center justify-between cursor-pointer">
           <div className="w-3/5 text-white pr-6">
             <h3 className="text-3xl md:text-4xl font-bold mb-2">{book.title}</h3>

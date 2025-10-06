@@ -32,8 +32,8 @@ const Footer = () => {
 						<div>
 							<h4 className="text-sm font-semibold mb-2">Explorer</h4>
 							<ul className="space-y-1 text-sm">
-								<li><Link to="/books" className="hover:text-gray-900">Livres</Link></li>
-								<li><Link to="/libraries" className="hover:text-gray-900">Bibliothèques</Link></li>
+								<li><Link to="/livres" className="hover:text-gray-900">Livres</Link></li>
+								<li><Link to="/bibliotheques" className="hover:text-gray-900">Bibliothèques</Link></li>
 								<li><Link to="/" className="hover:text-gray-900">Nouveautés</Link></li>
 							</ul>
 						</div>

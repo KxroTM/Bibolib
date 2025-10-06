@@ -61,7 +61,7 @@ const BooksPage = () => {
               </p>
             </div>
             {library && (
-              <Link to={`/library/${library.id}`} className="text-white underline">
+              <Link to={`/bibliotheque/${library.id}`} className="text-white underline">
                 Voir la bibliothèque →
               </Link>
             )}

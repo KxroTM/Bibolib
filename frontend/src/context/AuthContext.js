@@ -15,36 +15,29 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Initialisation simple : si token présent on attend le login explicite plus tard
   useEffect(() => {
+    const rawUser = localStorage.getItem('user');
+    if (rawUser) {
+      try { setUser(JSON.parse(rawUser)); } catch { /* noop */ }
+    }
+    // tenter une récupération des infos permissions si token
     const token = localStorage.getItem('token');
     if (token) {
-      // Vérifier si le token est valide
-      checkTokenValidity();
-    } else {
-      setLoading(false);
+      authService.me().then(res => {
+        setUser(res.data);
+        localStorage.setItem('user', JSON.stringify(res.data));
+      }).catch(() => {/* ignore, token peut être invalide */});
     }
+    setLoading(false);
   }, []);
-
-  const checkTokenValidity = async () => {
-    try {
-      const response = await authService.me();
-      setUser(response.data);
-    } catch (error) {
-      // Token invalide, on le supprime
-      localStorage.removeItem('token');
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const login = async (email, password) => {
     try {
-      const response = await authService.login(email, password);
-      const { token, user: userData } = response.data;
-      
+    const response = await authService.login(email, password);
+    const { token, user: userData } = response.data;
       localStorage.setItem('token', token);
-      localStorage.setItem('userEmail', email); // Pour le mode démo
+    localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
       
       return { success: true };
@@ -58,12 +51,16 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('userEmail');
+    localStorage.removeItem('user');
     setUser(null);
   };
 
   const isAdmin = () => {
-    return user && user.role === 'admin';
+    return user && (user.role === 'admin' || (user.roles && user.roles.includes('admin')));
+  };
+
+  const hasPermission = (perm) => {
+    return !!(user && user.permissions && user.permissions.includes(perm));
   };
 
   const value = {
@@ -71,6 +68,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     isAdmin,
+    hasPermission,
     loading
   };
 

@@ -23,7 +23,7 @@ const LibraryCard = ({ library }) => {
             </span>
           </div>
             <div className="absolute bottom-4 left-4 text-white">
-              <Link to={`/library/${library.id}`} className="block">
+              <Link to={`/bibliotheque/${library.id}`} className="block">
                 <h3 className="text-xl font-semibold drop-shadow-lg">
                   {library.name}
                 </h3>
@@ -51,9 +51,9 @@ const LibraryCard = ({ library }) => {
           </div>
 
           <div className="mt-4 flex items-center justify-between">
-            <Link to={`/library/${library.id}`} className="text-sm text-gray-600 hover:text-gray-800">Voir la bibliothèque</Link>
+            <Link to={`/bibliotheque/${library.id}`} className="text-sm text-gray-600 hover:text-gray-800">Voir la bibliothèque</Link>
             <Link
-              to={`/library/${library.id}`}
+              to={`/bibliotheque/${library.id}`}
               className="text-primary-600 hover:text-primary-700 font-medium text-sm"
             >
               Voir la bibliothèque →

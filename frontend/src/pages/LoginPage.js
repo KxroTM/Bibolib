@@ -12,10 +12,10 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Rediriger si déjà connecté
+  // Rediriger si déjà connecté (après premier rendu uniquement pour éviter boucle pendant tentative login)
   if (user) {
-    navigate('/admin');
-    return null;
+    // Utiliser un micro-task pour éviter setState pendant render
+    Promise.resolve().then(() => navigate('/admin'));
   }
 
   const handleSubmit = async (e) => {
@@ -41,19 +41,22 @@ const LoginPage = () => {
           navigate('/admin');
         }
       } else {
-        toast.error(result.error);
+        // Erreur logique retournée par authContext
+        toast.error(result.error || 'Identifiants invalides');
       }
     } catch (error) {
-      toast.error('Erreur de connexion');
+      const apiMsg = error?.response?.data?.message;
+      if (error?.response?.status === 401) {
+        toast.error(apiMsg || 'Email ou mot de passe incorrect');
+      } else {
+        toast.error(apiMsg || 'Erreur de connexion');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDemoLogin = () => {
-    setEmail('admin@bibolib.fr');
-    setPassword('admin123');
-  };
+  // Bouton démo supprimé
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -128,17 +131,7 @@ const LoginPage = () => {
             </button>
           </div>
 
-          {/* Bouton de démonstration */}
-          <div className="mt-4">
-            <button
-              type="button"
-              onClick={handleDemoLogin}
-              className="w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-            >
-              <span className="mr-2">🎯</span>
-              Utiliser les identifiants de démonstration
-            </button>
-          </div>
+          {/* Bouton démo retiré */}
 
           {/* Informations de test */}
           <div className="mt-6 space-y-3">
@@ -173,9 +166,15 @@ const LoginPage = () => {
             </div>
           </div>
 
-          <div className="text-center">
+          <div className="text-center space-y-3">
             <p className="text-xs text-gray-500">
               Connexion requise pour accéder au site
+            </p>
+            <p className="text-sm">
+              <span className="text-gray-600 mr-1">Pas encore de compte ?</span>
+              <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500 transition-colors">
+                Créer un compte
+              </Link>
             </p>
           </div>
         </form>

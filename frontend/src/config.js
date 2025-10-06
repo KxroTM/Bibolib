@@ -1,6 +1,6 @@
 // Configuration de l'API
 const API_CONFIG = {
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3001/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/',
   timeout: 10000,
   endpoints: {
     // Auth
@@ -8,8 +8,8 @@ const API_CONFIG = {
     me: '/auth/me',
     
     // Libraries
-    libraries: '/libraries',
-    librariesArrondissements: '/libraries/arrondissements',
+    libraries: '/bibliotheques',
+    librariesArrondissements: '/bibliotheques/arrondissements',
     
     // Books
     books: '/books',
@@ -17,7 +17,7 @@ const API_CONFIG = {
     
     // Admin
     adminBooks: '/admin/books',
-    adminLibraries: '/admin/libraries',
+    adminLibraries: '/admin/bibliotheques',
     adminUsers: '/admin/users',
     adminReservations: '/admin/reservations'
   }

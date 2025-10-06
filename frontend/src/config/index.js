@@ -1,7 +1,8 @@
 // Configuration de l'API
 const API_CONFIG = {
   // Base URL pour les appels API
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000',
+  // On force un /api si non fourni pour rester cohérent avec les endpoints backend /api/auth/*
+  baseURL: (process.env.REACT_APP_API_URL || 'http://localhost:5000').replace(/\/$/, ''),
   
   // Timeout pour les requêtes
   timeout: 10000,
@@ -9,21 +10,23 @@ const API_CONFIG = {
   // Endpoints
   endpoints: {
     // Authentification
-    login: '/api/auth/login',
-    me: '/api/auth/me',
+  login: '/api/auth/login',
+  me: '/api/auth/me',
     
     // Bibliothèques
-    libraries: '/api/libraries',
-    librariesArrondissements: '/api/libraries/arrondissements',
+  libraries: '/bibliotheques',
+  librariesArrondissements: '/bibliotheques/arrondissements',
     
     // Livres
-    books: '/api/books',
-    booksSearch: '/api/books/search',
+  books: '/books',
+  booksSearch: '/books/search',
     
     // Admin
-    adminBooks: '/api/admin/books',
-    adminLibraries: '/api/admin/libraries',
-    adminUsers: '/api/admin/users'
+  // Admin (réutilise les endpoints publics pour affichage dashboard)
+  adminBooks: '/books',
+  adminLibraries: '/admin/bibliotheques',
+  adminUsers: '/users',
+  adminReservations: '/reservations' // (non implémenté côté back pour l'instant)
   }
 };
 

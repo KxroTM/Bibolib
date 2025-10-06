@@ -120,7 +120,7 @@ const HomePage = () => {
                 {searchResults.map((b) => (
                   <Link
                     key={`${b.libraryId}-${b.id}`}
-                    to={`/library/${b.libraryId}?bookId=${b.id}`}
+                    to={`/bibliotheque/${b.libraryId}?bookId=${b.id}`}
                     className="block px-4 py-3 text-black hover:bg-gray-100 border-b last:border-b-0"
                   >
                     {b.libraryName} - {b.title}

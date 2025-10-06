@@ -7,6 +7,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Navbar from './components/Navbar';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import AdminDashboard from './pages/AdminDashboard';
 import BooksPage from './pages/BooksPage';
 import LibrariesPage from './pages/LibrariesPage';
@@ -14,6 +15,7 @@ import LibraryPage from './pages/LibraryPage';
 import BookDetailPage from './pages/BookDetailPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Footer from './components/Footer';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Composant pour protéger l'accès à l'application
 function AppContent() {
@@ -40,28 +42,41 @@ function AppContent() {
             element={user ? <Navigate to="/" replace /> : <LoginPage />}
           />
           <Route
+            path="/register"
+            element={user ? <Navigate to="/" replace /> : <RegisterPage />}
+          />
+          <Route
             path="/"
             element={<HomePage />}
           />
           <Route
-            path="/libraries"
+            path="/bibliotheques"
             element={<LibrariesPage />}
           />
+          {/* Ancienne route conservée avec redirection propre */}
           <Route
-            path="/books"
+            path="/libraries"
+            element={<Navigate to="/bibliotheques" replace />}
+          />
+          <Route
+            path="/livres"
             element={<BooksPage />}
           />
           <Route
-            path="/library/:id"
+            path="/bibliotheque/:id"
             element={<LibraryPage />}
           />
           <Route
-            path="/book/:id"
+            path="/livre/:id"
             element={<BookDetailPage />}
           />
+          {/* Routes legacy redirections */}
+          <Route path="/books" element={<Navigate to="/livres" replace />} />
+          <Route path="/book/:id" element={<Navigate to="/livre/:id" replace />} />
+          <Route path="/library/:id" element={<Navigate to="/bibliotheque/:id" replace />} />
           <Route
             path="/admin"
-            element={user ? <AdminDashboard /> : <Navigate to="/login" replace />}
+            element={<ProtectedRoute permission="ADMIN_DASHBOARD"><AdminDashboard /></ProtectedRoute>}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
