@@ -22,12 +22,9 @@ var logCollection *mongo.Collection
 // Initialisation MongoDB
 // -------------------------
 func initMongo() {
-	// Chargement flexible du .env
-	// 1. On tente d'abord le répertoire courant (si tu lances: go run ./activity_logs)
-	// 2. Puis on tente le parent (cas où tu lances: go run . depuis la racine)
-	// On ne fait pas log.Fatal ici, on vérifie ensuite les variables critiques.
+
 	_ = godotenv.Load(".env")
-	if os.Getenv("MONGO_URI") == "" { // pas trouvé dans courant
+	if os.Getenv("MONGO_URI") == "" {
 		_ = godotenv.Load("../.env")
 	}
 
