@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📚 BiboLib</title>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 40px; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+        }
+        .icon { 
+            font-size: 120px; 
+            margin-bottom: 20px;
+        }
+        h1 { 
+            font-size: 48px; 
+            margin: 0 0 10px 0; 
+            font-weight: 700;
+        }
+        p { 
+            font-size: 18px; 
+            opacity: 0.9; 
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📚</div>
+        <h1>BiboLib</h1>
+        <p>Votre favicon BiboLib est prêt !</p>
+        <p>Cette page sera votre favicon temporaire.</p>
+    </div>
+</body>
+</html>
