@@ -22,14 +22,22 @@ var logCollection *mongo.Collection
 // Initialisation MongoDB
 // -------------------------
 func initMongo() {
-	err := godotenv.Load("../.env")
-	if err != nil {
-		log.Fatal("Erreur lors du chargement du fichier .env")
+	// Chargement flexible du .env
+	// 1. On tente d'abord le répertoire courant (si tu lances: go run ./activity_logs)
+	// 2. Puis on tente le parent (cas où tu lances: go run . depuis la racine)
+	// On ne fait pas log.Fatal ici, on vérifie ensuite les variables critiques.
+	_ = godotenv.Load(".env")
+	if os.Getenv("MONGO_URI") == "" { // pas trouvé dans courant
+		_ = godotenv.Load("../.env")
 	}
 
 	uri := os.Getenv("MONGO_URI")
 	dbName := os.Getenv("MONGO_DB")
 	collectionName := os.Getenv("MONGO_COLLECTION")
+
+	if uri == "" || dbName == "" || collectionName == "" {
+		log.Fatal("Variables d'environnement manquantes (MONGO_URI / MONGO_DB / MONGO_COLLECTION). Vérifie ton fichier .env et le chemin de lancement.")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
