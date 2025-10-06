@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from models import db, create_user, get_all_users, create_bibliotheque, get_bibliotheque_by_id, create_all_tables
+from models import db, create_user, get_all_users, create_bibliotheque, get_bibliotheque_by_id, create_all_tables, get_all_bibliotheques, get_all_books, delete_book, get_book_by_id
 
 app = Flask(__name__)
 
@@ -46,6 +46,30 @@ def get_bibliotheque(biblio_id):
         return jsonify(dict(biblio))
     return jsonify({"message": "Bibliothèque non trouvée"}), 404
 
+@app.route("/bibliotheques", methods=["GET"])
+def list_bibliotheques():
+    bibliotheques = get_all_bibliotheques()
+    return jsonify([dict(b) for b in bibliotheques])
+
+@app.route("/books", methods=["GET"])
+def list_books():
+    books = get_all_books()
+    return jsonify([dict(b) for b in books])
+
+@app.route("/books/<int:book_id>", methods=["GET"])
+def get_book(book_id):
+    book = get_book_by_id(book_id)
+    if book:
+        return jsonify(dict(book))
+    return jsonify({"message": "Livre non trouvé"}), 404
+
+@app.route("/books/<int:book_id>", methods=["DELETE"])
+def remove_book(book_id):
+    book = get_book_by_id(book_id)
+    if book:
+        delete_book(book_id)
+        return jsonify({"message": "Livre supprimé"})
+    return jsonify({"message": "Livre non trouvé"}), 404
 
 if __name__ == "__main__":
     with app.app_context():

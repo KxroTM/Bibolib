@@ -84,6 +84,9 @@ def get_bibliotheque_by_id(biblio_id):
         {"id": biblio_id}
     ).fetchone()
 
+def get_all_bibliotheques():
+    return db.session.execute("SELECT * FROM bibliotheques").fetchall()
+
 # ==========================
 # Livres
 # ==========================
@@ -95,10 +98,38 @@ def create_book(title, author, bibliotheque_id, published_at=None):
     )
     db.session.commit()
 
+def delete_book(book_id):
+    db.session.execute(
+        "DELETE FROM books WHERE id = :id",
+        {"id": book_id}
+    )
+    db.session.commit()
+
 def get_book_by_id(book_id):
     return db.session.execute(
         "SELECT * FROM books WHERE id = :id",
         {"id": book_id}
+    ).fetchone()
+
+def get_all_books():
+    return db.session.execute("SELECT * FROM books").fetchall()
+
+def get_books_by_bibliotheque(biblio_id):
+    return db.session.execute(
+        "SELECT * FROM books WHERE bibliotheque_id = :biblio_id",
+        {"biblio_id": biblio_id}
+    ).fetchall()
+
+def get_book_by_bibliotheque_and_id(biblio_id, book_id):
+    return db.session.execute(
+        "SELECT * FROM books WHERE bibliotheque_id = :biblio_id AND id = :book_id",
+        {"biblio_id": biblio_id, "book_id": book_id}
+    ).fetchone()
+
+def get_book_by_bibliotheque_and_title(biblio_id, title):
+    return db.session.execute(
+        "SELECT * FROM books WHERE bibliotheque_id = :biblio_id AND title = :title",
+        {"biblio_id": biblio_id, "title": title}
     ).fetchone()
 
 # ==========================
