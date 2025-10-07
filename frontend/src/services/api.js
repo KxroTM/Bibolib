@@ -13,6 +13,7 @@ const api = axios.create({
   }
 });
 
+
 // DEMO_MODE retiré
 
 // Fonction helper pour simuler une réponse API
@@ -179,5 +180,6 @@ export const adminService = {
   // Réservations placeholder
   getReservations: () => Promise.resolve({ data: [] })
 };
+
 
 export default api;

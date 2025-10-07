@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import jwt
+import requests
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from sqlalchemy import text
@@ -56,6 +57,20 @@ app.config["JWT_SECRET"] = os.getenv("JWT_SECRET", "dev-secret-change-me")
 app.config["JWT_EXPIRE_MIN"] = int(os.getenv("JWT_EXPIRE_MIN", "120"))
 
 db.init_app(app)
+
+# ==================
+# Logging service integration (service Go)
+# ==================
+LOGS_SERVICE_URL = os.getenv("LOGS_SERVICE_URL", "http://activity_logs:8080")
+
+def send_activity_log(endpoint: str, payload: dict):
+    url = f"{LOGS_SERVICE_URL}{endpoint}"
+    try:
+        r = requests.post(url, json=payload, timeout=2)
+        if r.status_code >= 400:
+            print(f"[logs] Echec envoi {endpoint} status={r.status_code} body={r.text}")
+    except Exception as e:
+        print(f"[logs] Erreur envoi {endpoint}: {e}")
 
 # Helper conversion pour Row SQLAlchemy 2.0 -> dict
 def row_to_dict(row):
@@ -149,6 +164,12 @@ def register():
         return jsonify({"message": "Email déjà utilisé"}), 409
     user = create_user(data['username'], data['email'], data['password'])
     token = create_token(user['id'])
+    # Envoi du log création de compte (best effort)
+    send_activity_log("/auth/create-account", {
+        "user_id": user['id'],
+        "username": user['username'],
+        "ip": request.remote_addr or 'backend'
+    })
     return jsonify({"token": token, "user": user}), 201
 
 @app.route('/auth/login', methods=['POST'])
