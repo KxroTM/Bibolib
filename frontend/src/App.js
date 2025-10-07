@@ -13,6 +13,7 @@ import BooksPage from './pages/BooksPage';
 import LibrariesPage from './pages/LibrariesPage';
 import LibraryPage from './pages/LibraryPage';
 import BookDetailPage from './pages/BookDetailPage';
+import FaqPage from './pages/FaqPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -69,6 +70,10 @@ function AppContent() {
           <Route
             path="/livre/:id"
             element={<BookDetailPage />}
+          />
+          <Route
+            path="/faq"
+            element={<FaqPage />}
           />
           {/* Routes legacy redirections */}
           <Route path="/books" element={<Navigate to="/livres" replace />} />

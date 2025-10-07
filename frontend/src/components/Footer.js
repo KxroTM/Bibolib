@@ -40,11 +40,11 @@ const Footer = () => {
 
 						<div>
 							<h4 className="text-sm font-semibold mb-2">Support</h4>
-							<ul className="space-y-1 text-sm">
-								<li><a href="#" className="hover:text-gray-900">Contact</a></li>
-								<li><a href="#" className="hover:text-gray-900">FAQ</a></li>
-								<li><a href="#" className="hover:text-gray-900">Conditions</a></li>
-							</ul>
+								<ul className="space-y-1 text-sm">
+									<li><a href="#" className="hover:text-gray-900">Contact</a></li>
+									<li><Link to="/faq" className="hover:text-gray-900">FAQ</Link></li>
+									<li><a href="#" className="hover:text-gray-900">Conditions</a></li>
+								</ul>
 						</div>
 					</div>
 
