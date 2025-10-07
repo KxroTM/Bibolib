@@ -4,3 +4,4 @@ flask-cors
 PyJWT
 pymysql
 werkzeug
+cryptography

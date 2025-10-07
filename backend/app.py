@@ -529,4 +529,4 @@ if __name__ == "__main__":
     with app.app_context():
         create_all_tables()
         seed_admin()
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)

@@ -1,0 +1,70 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: bibolib-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: bibolib
+      MYSQL_USER: bibolib_user
+      MYSQL_PASSWORD: bibolib_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./bibolib.sql:/docker-entrypoint-initdb.d/bibolib.sql
+    networks:
+      - appnet
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  activity_logs:
+    build:
+      context: ./activity_logs
+    ports:
+      - "8080:8080"
+    networks:
+      - appnet
+    env_file:
+      - .env
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      mysql:
+        condition: service_healthy
+      activity_logs:
+        condition: service_started
+    networks:
+      - appnet
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=mysql+pymysql://bibolib_user:bibolib_password@mysql:3306/bibolib
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - backend
+    networks:
+      - appnet
+    env_file:
+      - .env
+
+volumes:
+  mysql_data:
+
+networks:
+  appnet:
+    driver: bridge
