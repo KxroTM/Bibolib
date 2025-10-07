@@ -49,9 +49,3 @@ Vous devriez voir 4 conteneurs en cours d'exécution :
 - **API Backend** : http://localhost:5000
 - **Service de Logs** : http://localhost:8080
 - **Base de données MySQL** : localhost:3307
-
-1. Fork le projet
-2. Créer une branche pour votre fonctionnalité
-3. Commit vos changements
-4. Push vers la branche
-5. Créer une Pull Request
