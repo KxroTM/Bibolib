@@ -55,6 +55,8 @@ services:
       - "3000:3000"
     volumes:
       - ./frontend:/app
+      # Anonymous volume to keep container's node_modules (faster than bind mount on Windows)
+      - /app/node_modules
     depends_on:
       - backend
     networks:
