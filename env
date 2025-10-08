@@ -1,0 +1,22 @@
+# Configuration MongoDB pour les logs
+MONGO_URI=mongodb+srv://endhayyygg_db_user:Elias782631878@cluster0.nzugabx.mongodb.net/
+MONGO_DB=logs
+MONGO_COLLECTION=logs
+
+# Configuration MySQL
+DB_HOST=mysql
+DB_PORT=3306
+DB_USER=bibolib_user
+DB_PASSWORD=bibolib_password
+DB_NAME=bibolib
+
+# Configuration pour le backend Flask
+DATABASE_URL=mysql+pymysql://bibolib_user:bibolib_password@mysql:3306/bibolib
+JWT_SECRET=votre-secret-jwt-super-secure-changez-moi-en-production
+JWT_EXPIRE_MIN=120
+
+# Configuration MySQL pour Docker
+MYSQL_ROOT_PASSWORD=rootpassword
+MYSQL_DATABASE=bibolib
+MYSQL_USER=bibolib_user
+MYSQL_PASSWORD=bibolib_password
