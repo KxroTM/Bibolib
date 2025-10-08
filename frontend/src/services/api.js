@@ -179,6 +179,14 @@ export const adminService = {
 
   // Réservations placeholder
   getReservations: () => Promise.resolve({ data: [] })
+  ,
+  // Logs (service externe activity_logs, par défaut sur :8080)
+  getLogs: (params = {}) => {
+    // Appelle l'API d'activity_logs directement (override baseURL)
+    return axios.get('http://localhost:8080/logs', { params })
+      .then(res => ({ data: res.data }))
+      .catch(err => ({ error: err, data: { logs: [], total: 0, page: 1, limit: params.limit || 50, total_pages: 0 } }));
+  }
 };
 
 

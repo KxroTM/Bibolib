@@ -9,6 +9,7 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminLogsPage from './pages/AdminLogsPage';
 import BooksPage from './pages/BooksPage';
 import LibrariesPage from './pages/LibrariesPage';
 import LibraryPage from './pages/LibraryPage';
@@ -82,6 +83,10 @@ function AppContent() {
           <Route
             path="/admin"
             element={<ProtectedRoute permission="ADMIN_DASHBOARD"><AdminDashboard /></ProtectedRoute>}
+          />
+          <Route
+            path="/admin/logs"
+            element={<ProtectedRoute permission="ADMIN_DASHBOARD"><AdminLogsPage /></ProtectedRoute>}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
