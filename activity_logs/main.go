@@ -155,9 +155,11 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		user := struct {
-			UserID   int    `json:"user_id"`
-			Username string `json:"username"`
-			IP       string `json:"ip"`
+			UserID   int      `json:"user_id"`
+			Username string   `json:"username"`
+			IP       string   `json:"ip"`
+			NewRoles []string `json:"newroles"`
+			OldRoles []string `json:"oldroles"`
 		}{}
 		if err := c.ShouldBindJSON(&user); err != nil {
 			c.JSON(400, gin.H{"error": "Données invalides"})

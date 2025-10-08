@@ -256,6 +256,13 @@ def edit_user(user_id):
             assign_role_to_user(user_id, role['id'])
     refreshed = get_user_by_id(user_id)
     refreshed_roles = get_roles_for_user(user_id)
+    send_activity_log("/auth/user-roles-change", {
+        "user_id": user_id,
+        "username": refreshed['username'],
+        "ip": request.remote_addr or 'backend',
+        "oldroles": get_roles_for_user(user_id),
+        "newroles": refreshed_roles
+    })
     return jsonify({**refreshed, 'roles': refreshed_roles})
 
 @app.route('/users/<int:user_id>', methods=['DELETE'])
@@ -266,6 +273,16 @@ def remove_user(user_id):
     if not u:
         return jsonify({'message': 'Utilisateur non trouvé'}), 404
     delete_user(user_id)
+    send_activity_log("/auth/delete-account", {
+        "user_id": user_id,
+        "username": u['username'],
+        "ip": request.remote_addr or 'backend'
+    })
+    send_activity_log("/auth/delete-account", {
+        "user_id": user_id,
+        "username": u['username'],
+        "ip": request.remote_addr or 'backend'
+    })
     return jsonify({'message': 'Utilisateur supprimé'})
 
 # ==================
