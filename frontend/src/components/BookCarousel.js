@@ -3,46 +3,54 @@ import BookCard from './BookCard';
 
 const BookCarousel = ({ books, title, subtitle, speed = 40 }) => {
   const scrollRef = useRef(null);
+  const innerRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
+  const isHoveredRef = useRef(false);
   const rafRef = useRef(null);
   const lastTsRef = useRef(null);
+  const offsetRef = useRef(0);
 
   useEffect(() => {
     const sc = scrollRef.current;
-    if (!sc || books.length === 0) return;
+    const inner = innerRef.current;
+    if (!sc || !inner || books.length === 0) return;
 
     let running = true;
 
     const step = (ts) => {
       if (!running) return;
-
       if (!lastTsRef.current) lastTsRef.current = ts;
       const delta = ts - lastTsRef.current;
       lastTsRef.current = ts;
 
-      // only scroll if content overflows and not hovered
-      const maxScrollLeft = sc.scrollWidth - sc.clientWidth;
-      if (!isHovered && maxScrollLeft > 0) {
+      const singleSetWidth = inner.scrollWidth / 2;
+
+      if (!isHoveredRef.current) {
         const distance = (speed * delta) / 1000; // pixels per ms
-        sc.scrollLeft = sc.scrollLeft + distance;
-        if (sc.scrollLeft >= maxScrollLeft) {
-          // loop back to start
-          sc.scrollLeft = 0;
+        offsetRef.current += distance;
+        if (offsetRef.current >= singleSetWidth) {
+          offsetRef.current -= singleSetWidth;
         }
+        inner.style.transform = `translateX(${-offsetRef.current}px)`;
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.debug('[BookCarousel] offset', offsetRef.current, 'singleSetWidth', singleSetWidth, 'hover', isHoveredRef.current);
       }
 
       rafRef.current = requestAnimationFrame(step);
     };
 
-    // start
     rafRef.current = requestAnimationFrame(step);
 
     return () => {
       running = false;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       lastTsRef.current = null;
+      // keep offsetRef.current so resume happens from the same place
     };
-  }, [books, isHovered, speed]);
+  }, [books, speed]);
 
   const scrollLeft = () => {
     scrollRef.current?.scrollBy({
@@ -93,19 +101,29 @@ const BookCarousel = ({ books, title, subtitle, speed = 40 }) => {
       <div className="relative">
         <div
           ref={scrollRef}
-          className="flex overflow-x-auto scrollbar-hide space-x-6 pb-4"
+          className="overflow-hidden pb-4"
           style={{
             scrollbarWidth: 'none',
             msOverflowStyle: 'none'
           }}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
+          onMouseEnter={() => {
+            setIsHovered(true);
+            isHoveredRef.current = true;
+            if (process.env.NODE_ENV === 'development') console.debug('[BookCarousel] hover enter');
+          }}
+          onMouseLeave={() => {
+            setIsHovered(false);
+            isHoveredRef.current = false;
+            if (process.env.NODE_ENV === 'development') console.debug('[BookCarousel] hover leave');
+          }}
         >
-          {books.map((book) => (
-            <div key={book.id} className="flex-none w-80">
-              <BookCard book={book} showLibrary={true} />
-            </div>
-          ))}
+          <div ref={innerRef} className="flex space-x-6 will-change-transform">
+            {[...books, ...books].map((book, idx) => (
+              <div key={`${book.id}-${idx}`} className="flex-none w-80">
+                <BookCard book={book} showLibrary={true} />
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Gradient de fondu sur les côtés */}

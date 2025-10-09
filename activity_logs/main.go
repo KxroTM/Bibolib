@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -457,7 +458,7 @@ func main() {
 	// Endpoints GET pour dashboard admin
 	// -------------------------
 
-	// Récupérer tous les logs avec pagination
+	// Récupérer tous les logs avec pagination et filtres
 	r.GET("/logs", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -478,13 +479,85 @@ func main() {
 
 		skip := (pageInt - 1) * limitInt
 
+		// Build filter from optional query params
+		filter := bson.M{}
+
+		// module filter
+		if module := c.Query("module"); module != "" {
+			filter["module"] = module
+		}
+
+		// action filter (supporte liste comma-separated)
+		if action := c.Query("action"); action != "" {
+			if strings.Contains(action, ",") {
+				parts := strings.Split(action, ",")
+				// trim spaces
+				for i := range parts {
+					parts[i] = strings.TrimSpace(parts[i])
+				}
+				filter["action"] = bson.M{"$in": parts}
+			} else {
+				filter["action"] = action
+			}
+		}
+
+		// status filter
+		if status := c.Query("status"); status != "" {
+			filter["status"] = status
+		}
+
+		// username (partial match)
+		if username := c.Query("username"); username != "" {
+			filter["username"] = bson.M{"$regex": username, "$options": "i"}
+		}
+
+		// ip (exact or partial)
+		if ip := c.Query("ip"); ip != "" {
+			if strings.Contains(ip, "*") || strings.Contains(ip, "%") {
+				// translate wildcard * to regex
+				re := strings.ReplaceAll(ip, "*", ".*")
+				filter["ip"] = bson.M{"$regex": re, "$options": "i"}
+			} else {
+				filter["ip"] = ip
+			}
+		}
+
+		// user_id
+		if userIDStr := c.Query("user_id"); userIDStr != "" {
+			if uid, err := strconv.Atoi(userIDStr); err == nil {
+				filter["user_id"] = uid
+			}
+		}
+
+		// date range
+		startDateStr := c.Query("start_date")
+		endDateStr := c.Query("end_date")
+		if startDateStr != "" || endDateStr != "" {
+			var dateFilter bson.M = bson.M{}
+			if startDateStr != "" {
+				if sd, err := time.Parse("2006-01-02", startDateStr); err == nil {
+					dateFilter["$gte"] = sd
+				}
+			}
+			if endDateStr != "" {
+				if ed, err := time.Parse("2006-01-02", endDateStr); err == nil {
+					// include entire day
+					ed = ed.Add(24*time.Hour - time.Nanosecond)
+					dateFilter["$lte"] = ed
+				}
+			}
+			if len(dateFilter) > 0 {
+				filter["timestamp"] = dateFilter
+			}
+		}
+
 		// Options de tri par timestamp décroissant
 		findOptions := options.Find()
 		findOptions.SetSort(bson.M{"timestamp": -1})
 		findOptions.SetLimit(int64(limitInt))
 		findOptions.SetSkip(int64(skip))
 
-		cursor, err := logCollection.Find(ctx, bson.D{}, findOptions)
+		cursor, err := logCollection.Find(ctx, filter, findOptions)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Erreur lors de la récupération des logs"})
 			return
@@ -497,8 +570,8 @@ func main() {
 			return
 		}
 
-		// Compter le nombre total de logs
-		total, err := logCollection.CountDocuments(ctx, bson.D{})
+		// Compter le nombre total de logs correspondant au filtre
+		total, err := logCollection.CountDocuments(ctx, filter)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Erreur lors du comptage des logs"})
 			return
@@ -506,6 +579,7 @@ func main() {
 
 		c.JSON(200, gin.H{
 			"logs":        logs,
+			"filter":      filter,
 			"total":       total,
 			"page":        pageInt,
 			"limit":       limitInt,

@@ -25,7 +25,7 @@ const Navbar = () => {
                   className="w-10 h-10 object-contain"
                 />
               </div>
-              <span className="text-2xl font-bold text-gray-800">BiboLib</span>
+              <span className="text-2xl font-bold text-gray-800">Bibliothèque numérique</span>
             </Link>
           </div>
 

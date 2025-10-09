@@ -33,6 +33,13 @@ const mockApiResponse = (data, delay = 500) => {
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+      // Debug: afficher en dev si le token est présent lors des requêtes
+      try {
+        if (process.env.NODE_ENV === 'development') {
+          // eslint-disable-next-line no-console
+          console.debug('[api] Request', config.method?.toUpperCase(), config.url, 'token?', !!token);
+        }
+      } catch (e) { /* noop */ }
       return config;
     },
     (error) => {

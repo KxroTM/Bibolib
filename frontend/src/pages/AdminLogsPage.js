@@ -11,6 +11,18 @@ const AdminLogsPage = () => {
   const [limit] = useState(50);
   const [totalPages, setTotalPages] = useState(1);
   const [query, setQuery] = useState('');
+  // Filters
+  const [moduleFilter, setModuleFilter] = useState('');
+  const [actionFilter, setActionFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  const ACTION_OPTIONS = [
+    'CREATE_ACCOUNT','USER_DELETE_ACCOUNT','USER_UPDATE','USER_ROLES_CHANGE','PASSWORD_CHANGE',
+    'USER_DELETE','ADD_BOOK','UPDATE_BOOK','DELETE_BOOK','BOOK_STATUS_CHANGE','BOOK_RESERVED',
+    'BOOK_RESERVED_CANCEL','BOOK_RETURNED','ROLE_CREATE','ROLE_UPDATE','ROLE_DELETE','ROLE_ASSIGNED','ROLE_REMOVED'
+  ];
 
   useEffect(() => {
     loadLogs();
@@ -19,7 +31,18 @@ const AdminLogsPage = () => {
   const loadLogs = async (opts = {}) => {
     setLoading(true);
     try {
-      const params = { page, limit, ...(opts.query ? { q: opts.query } : {}) };
+      const pageParam = opts.page !== undefined ? opts.page : page;
+      const params = {
+        page: pageParam,
+        limit,
+        ...(opts.query ? { q: opts.query } : {}),
+        ...(opts.module ? { module: opts.module } : {}),
+        ...(opts.action ? { action: opts.action } : {}),
+        ...(opts.status ? { status: opts.status } : {}),
+        ...(opts.start_date ? { start_date: opts.start_date } : {}),
+        ...(opts.end_date ? { end_date: opts.end_date } : {}),
+      };
+
       const res = await adminService.getLogs(params);
       if (res.error) throw res.error;
       const data = res.data || {};
@@ -39,6 +62,31 @@ const AdminLogsPage = () => {
     await loadLogs({ query });
   };
 
+  const handleApplyFilters = async (e) => {
+    e && e.preventDefault && e.preventDefault();
+    setPage(1);
+    const params = {
+      page: 1,
+      module: moduleFilter,
+      action: actionFilter,
+      status: statusFilter,
+      start_date: startDate,
+      end_date: endDate,
+    };
+    await loadLogs(params);
+  };
+
+  const handleResetFilters = async () => {
+    setModuleFilter('');
+    setActionFilter('');
+    setStatusFilter('');
+    setStartDate('');
+    setEndDate('');
+    setQuery('');
+    setPage(1);
+    await loadLogs();
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-lg shadow-sm p-6">
@@ -47,9 +95,58 @@ const AdminLogsPage = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm p-6">
-        <form onSubmit={handleSearch} className="flex gap-2 mb-4">
-          <input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Rechercher (username/action/module/ip)" className="input flex-1" />
-          <button className="btn btn-primary" type="submit">Rechercher</button>
+        <form onSubmit={handleSearch} className="mb-4">
+          <div className="flex gap-2">
+            <input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Rechercher (username/action/module/ip)" className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700" type="submit">Rechercher</button>
+          </div>
+
+          <div className="mt-4 bg-gray-50 border border-gray-100 rounded-lg p-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Module</label>
+                    <select value={moduleFilter} onChange={(e)=>setModuleFilter(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Tous</option>
+                      <option value="auth">auth</option>
+                      <option value="books">books</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Action</label>
+                    <select value={actionFilter} onChange={(e)=>setActionFilter(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Toutes</option>
+                      {ACTION_OPTIONS.map(a => (<option key={a} value={a}>{a}</option>))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Status</label>
+                    <select value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Tous</option>
+                      <option value="success">success</option>
+                      <option value="failure">failure</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Start date</label>
+                    <input type="date" value={startDate} onChange={(e)=>setStartDate(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">End date</label>
+                    <input type="date" value={endDate} onChange={(e)=>setEndDate(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center gap-3">
+                  <button type="button" onClick={handleApplyFilters} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Appliquer</button>
+                  <button type="button" onClick={handleResetFilters} className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200">Réinitialiser</button>
+                  <div className="ml-auto text-sm text-gray-500">Filtres appliqués: <span className="font-medium">{logs.length}</span></div>
+                </div>
+              </div>
         </form>
 
         {loading ? (

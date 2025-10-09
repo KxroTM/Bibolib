@@ -62,7 +62,7 @@ const RegisterPage = () => {
             Créer un compte
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Rejoignez BiboLib et explorez les bibliothèques parisiennes
+            Rejoignez Bibliothèque numérique et explorez les bibliothèques parisiennes
           </p>
         </div>
 

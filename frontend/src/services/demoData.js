@@ -421,7 +421,7 @@ export const demoUsers = [
   {
     id: 1,
     name: "Admin Principal",
-    email: "admin@bibolib.fr",
+  email: "admin@bibliotheque.local",
     password: "admin123",
     role: "admin",
     createdAt: "2024-01-01T00:00:00.000Z",
@@ -430,7 +430,7 @@ export const demoUsers = [
   {
     id: 2,
     name: "Marie Dubois",
-    email: "marie.dubois@bibolib.fr",
+  email: "marie.dubois@bibliotheque.local",
     password: "marie123",
     role: "moderator",
     createdAt: "2024-02-15T00:00:00.000Z",
