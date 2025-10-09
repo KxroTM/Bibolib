@@ -16,7 +16,7 @@ const HomePage = () => {
         <div className="absolute inset-0 bg-black bg-opacity-50"></div>
         <div className="relative z-10 flex items-center justify-center h-full text-center text-white">
           <div>
-            <h1 className="text-5xl font-bold mb-4">BiboLib Paris</h1>
+            <h1 className="text-5xl font-bold mb-4">Bibliothèque numérique Paris</h1>
             <p className="text-xl mb-8">Découvrez les trésors des bibliothèques parisiennes</p>
             <Link 
               to="/libraries" 
@@ -30,7 +30,7 @@ const HomePage = () => {
 
       <div className="space-y-12">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">Bienvenue sur BiboLib</h2>
+          <h2 className="text-3xl font-bold text-gray-800 mb-4">Bienvenue sur Bibliothèque numérique</h2>
           <p className="text-gray-600 max-w-2xl mx-auto">
             Explorez les collections des bibliothèques parisiennes, réservez vos livres préférés 
             et découvrez de nouveaux ouvrages dans un écosystème numérique moderne.

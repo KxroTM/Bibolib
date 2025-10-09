@@ -25,12 +25,16 @@ const BookDetailPage = () => {
       setLoading(true);
       
       const response = await bookService.getById(id);
-      setBook(response.data.book);
-      setLibrary(response.data.library);
+      // backend renvoie l'objet livre directement (pas { book: ... })
+      setBook(response.data || null);
+      // library peut ne pas être fournie par l'API
+      setLibrary(response.data?.library || null);
       
     } catch (error) {
       console.error('Erreur lors du chargement du livre:', error);
-      toast.error('Erreur lors du chargement du livre');
+      const serverMsg = error?.response?.data?.message;
+      const status = error?.response?.status;
+      toast.error(`Erreur lors du chargement du livre${status ? ' ('+status+')' : ''}${serverMsg ? ': '+serverMsg : ''}`);
       
       // Données de démonstration
       const demoBook = {
@@ -78,7 +82,8 @@ const BookDetailPage = () => {
   };
 
   const handleReserve = async (bookId) => {
-    if (!user) {
+    const token = localStorage.getItem('token');
+    if (!user || !token) {
       // redirect to login and come back here after
       navigate('/login', { state: { from: location.pathname } });
       return;

@@ -103,7 +103,7 @@ const HomePage = () => {
         <div className="absolute inset-0 bg-blue-900 bg-opacity-70"></div>
         <div className="relative z-10 container mx-auto px-4 text-center text-white">
           <h1 className="text-5xl md:text-6xl font-bold mb-3 drop-shadow-lg">
-            BiboLib Paris
+            Bibliothèque numérique Paris
           </h1>
           <p className="text-xl md:text-2xl mb-4 drop-shadow-lg">
             Découvrez les livres des bibliothèques parisiennes

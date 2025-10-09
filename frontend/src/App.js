@@ -9,14 +9,18 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminLogsPage from './pages/AdminLogsPage';
 import BooksPage from './pages/BooksPage';
 import LibrariesPage from './pages/LibrariesPage';
 import LibraryPage from './pages/LibraryPage';
 import BookDetailPage from './pages/BookDetailPage';
 import FaqPage from './pages/FaqPage';
+import ContactPage from './pages/ContactPage';
+import ConditionsPage from './pages/ConditionsPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
+import ChatWidget from './components/ChatWidget';
 
 // Composant pour protéger l'accès à l'application
 function AppContent() {
@@ -75,6 +79,14 @@ function AppContent() {
             path="/faq"
             element={<FaqPage />}
           />
+          <Route
+            path="/contact"
+            element={<ContactPage />}
+          />
+          <Route
+            path="/conditions"
+            element={<ConditionsPage />}
+          />
           {/* Routes legacy redirections */}
           <Route path="/books" element={<Navigate to="/livres" replace />} />
           <Route path="/book/:id" element={<Navigate to="/livre/:id" replace />} />
@@ -83,10 +95,15 @@ function AppContent() {
             path="/admin"
             element={<ProtectedRoute permission="ADMIN_DASHBOARD"><AdminDashboard /></ProtectedRoute>}
           />
+          <Route
+            path="/admin/logs"
+            element={<ProtectedRoute permission="ADMIN_DASHBOARD"><AdminLogsPage /></ProtectedRoute>}
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
       <Footer />
+  <ChatWidget />
       <ToastContainer
         position="top-right"
         autoClose={3000}

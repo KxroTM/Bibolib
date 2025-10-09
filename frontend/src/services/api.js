@@ -33,6 +33,13 @@ const mockApiResponse = (data, delay = 500) => {
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+      // Debug: afficher en dev si le token est présent lors des requêtes
+      try {
+        if (process.env.NODE_ENV === 'development') {
+          // eslint-disable-next-line no-console
+          console.debug('[api] Request', config.method?.toUpperCase(), config.url, 'token?', !!token);
+        }
+      } catch (e) { /* noop */ }
       return config;
     },
     (error) => {
@@ -179,6 +186,14 @@ export const adminService = {
 
   // Réservations placeholder
   getReservations: () => Promise.resolve({ data: [] })
+  ,
+  // Logs (service externe activity_logs, par défaut sur :8080)
+  getLogs: (params = {}) => {
+    // Appelle l'API d'activity_logs directement (override baseURL)
+    return axios.get('http://localhost:8080/logs', { params })
+      .then(res => ({ data: res.data }))
+      .catch(err => ({ error: err, data: { logs: [], total: 0, page: 1, limit: params.limit || 50, total_pages: 0 } }));
+  }
 };
 
 

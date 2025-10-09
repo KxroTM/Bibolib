@@ -17,19 +17,32 @@ export const AuthProvider = ({ children }) => {
 
   // Initialisation simple : si token présent on attend le login explicite plus tard
   useEffect(() => {
-    const rawUser = localStorage.getItem('user');
-    if (rawUser) {
-      try { setUser(JSON.parse(rawUser)); } catch { /* noop */ }
-    }
-    // tenter une récupération des infos permissions si token
-    const token = localStorage.getItem('token');
-    if (token) {
-      authService.me().then(res => {
+    const init = async () => {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        // Pas de token -> pas d'utilisateur authentifié
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      // Si token présent, tenter de récupérer l'utilisateur courant
+      try {
+        const res = await authService.me();
         setUser(res.data);
         localStorage.setItem('user', JSON.stringify(res.data));
-      }).catch(() => {/* ignore, token peut être invalide */});
-    }
-    setLoading(false);
+      } catch (err) {
+        // Token invalide ou erreur : nettoyer
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    init();
   }, []);
 
   const login = async (email, password) => {

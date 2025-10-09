@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { adminService } from '../services/api';
 import { toast } from 'react-toastify';
 import Loader from '../components/Loader';
@@ -200,12 +201,22 @@ const AdminDashboard = () => {
     <div className="space-y-8">
       {/* En-tête */}
       <div className="bg-white rounded-lg shadow-sm p-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">
-          Panneau d'Administration
-        </h1>
-        <p className="text-gray-600">
-          Gérez les livres, bibliothèques et administrateurs de BiboLib
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">
+              Panneau d'Administration
+            </h1>
+            <p className="text-gray-600">
+              Gérez les livres, bibliothèques et administrateurs de BiboLib
+            </p>
+          </div>
+          <div>
+            <Link to="/admin/logs" className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm text-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h3V6a1 1 0 112 0v4h3a1 1 0 110 2H8v4a1 1 0 11-2 0v-4H3a1 1 0 01-1-1z"/></svg>
+              Voir les logs
+            </Link>
+          </div>
+        </div>
       </div>
 
       {/* Statistiques */}
@@ -277,6 +288,7 @@ const AdminDashboard = () => {
               {activeTab === 'libraries' && 'Bibliothèques'}
               {activeTab === 'admins' && 'Utilisateurs'}
             </h2>
+            
             {readOnly ? (
               <span className="text-xs uppercase tracking-wide text-gray-400">Lecture seule</span>
             ) : (
