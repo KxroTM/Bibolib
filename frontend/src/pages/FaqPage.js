@@ -29,7 +29,7 @@ const FaqPage = () => {
     <div className="max-w-3xl mx-auto">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">FAQ — Questions fréquentes</h1>
-        <p className="text-gray-600 mt-2">Retrouvez ici les réponses aux questions courantes sur l'utilisation de BiboLib.</p>
+  <p className="text-gray-600 mt-2">Retrouvez ici les réponses aux questions courantes sur l'utilisation de Bibliothèque numérique.</p>
         <p className="mt-2 text-sm">Retour à la <Link to="/" className="text-blue-600 hover:underline">page d'accueil</Link>.</p>
       </div>
 

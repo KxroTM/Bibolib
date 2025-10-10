@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
+// Team was intentionally removed from footer — profiles live on the Contact page now.
+
 const Footer = () => {
 	const [email, setEmail] = useState('');
 
@@ -47,9 +49,9 @@ const Footer = () => {
 						<div>
 							<h4 className="text-sm font-semibold mb-2">Support</h4>
 								<ul className="space-y-1 text-sm">
-									<li><a href="#" className="hover:text-gray-900">Contact</a></li>
+									<li><Link to="/contact" className="hover:text-gray-900">Contact</Link></li>
 									<li><Link to="/faq" className="hover:text-gray-900">FAQ</Link></li>
-									<li><a href="#" className="hover:text-gray-900">Conditions</a></li>
+									<li><Link to="/conditions" className="hover:text-gray-900">Conditions</Link></li>
 								</ul>
 						</div>
 					</div>
@@ -81,10 +83,12 @@ const Footer = () => {
 							</a>
 						</div>
 					</div>
+
+					{/* Team removed from footer */}
 				</div>
 
 				<div className="mt-6 pt-4 border-t text-xs text-gray-500 text-center">
-					© {new Date().getFullYear()} BiboLib — Tous droits réservés • Conçu par ELias Giovanni Youssef Ilyes
+					© {new Date().getFullYear()} Bibliothèque numérique — Tous droits réservés • Conçu par ELias Giovanni Youssef Ilyes
 				</div>
 			</div>
 		</footer>

@@ -1,6 +1,6 @@
-# 📚 Bibolib - Système de Gestion de Bibliothèques
+# 📚 Bibliothèque numérique - Système de Gestion de Bibliothèques
 
-Bibolib est une application complète de gestion de bibliothèques développée avec une architecture microservices utilisant React, Flask, Go et MySQL.
+Bibliothèque numérique est une application complète de gestion de bibliothèques développée avec une architecture microservices utilisant React, Flask, Go et MySQL.
 
 ## 🏗️ Architecture
 
