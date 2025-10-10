@@ -445,6 +445,13 @@ def add_book():
         return jsonify({"message": "Champs manquants"}), 400
     # create_book accepte maintenant les clés API
     new_book = create_book(**data)
+    send_activity_log("/books/add-book", {
+        "user_id": request.current_user['id'],
+        "username": request.current_user['username'],
+        "book_id": new_book['id'],
+        "title": new_book['title'],
+        "ip": request.remote_addr or 'backend'
+    })
     return jsonify(new_book), 201
 
 @app.route("/books/<int:book_id>", methods=["PUT"])
@@ -476,6 +483,12 @@ def remove_book(book_id):
     if book:
         delete_book(book_id)
         return jsonify({"message": "Livre supprimé"})
+    send_activity_log("/books/delete-book", {
+        "user_id": request.current_user['id'],
+        "username": request.current_user['username'],
+        "book_id": book_id,
+        "ip": request.remote_addr or 'backend'
+    })
     return jsonify({"message": "Livre non trouvé"}), 404
 
 # =============== Extended library/book endpoints expected by frontend ===============
@@ -648,6 +661,13 @@ def reserve(book_id):
     due_date = datetime.now(timezone.utc) + timedelta(days=3)
     reserve_book(request.current_user['id'], book_id, due_date)
     updated = get_book_by_id(book_id)
+    send_activity_log("/books/book-reserved", {
+        "user_id": request.current_user['id'],
+        "username": request.current_user['username'],
+        "title": book['title'],
+        "book_id": book_id,
+        "ip": request.remote_addr or 'backend'
+    })
     return jsonify({'message': 'Livre réservé', 'book': updated})
 
 @app.route('/books/<int:book_id>/borrow', methods=['POST'])
@@ -684,6 +704,12 @@ def return_book_endpoint(book_id):
         # Just set status available
         set_book_status(book_id, 'available')
     updated = get_book_by_id(book_id)
+    send_activity_log("/books/book-returned", {
+        "user_id": request.current_user['id'],
+        "username": request.current_user['username'],
+        "book_id": book_id,
+        "ip": request.remote_addr or 'backend'
+    })
     return jsonify({'message': 'Livre retourné', 'book': updated})
 
 def seed_admin():

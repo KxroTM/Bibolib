@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { bookService } from '../services/api';
+import { bookService, adminService, libraryService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Loader from '../components/Loader';
 import BookStatus from '../components/BookStatus';
@@ -15,10 +15,84 @@ const BookDetailPage = () => {
   const [library, setLibrary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const [availableLibraries, setAvailableLibraries] = useState([]);
+  const [loadingLibraries, setLoadingLibraries] = useState(false);
 
   useEffect(() => {
     loadBookData();
   }, [id]);
+
+  useEffect(() => {
+    // Charger les bibliothèques disponibles quand on a les données du livre
+    if (book && book.title) {
+      loadAvailableLibraries();
+    }
+  }, [book]);
+
+  const loadAvailableLibraries = async () => {
+    try {
+      setLoadingLibraries(true);
+      
+      // Récupérer tous les livres avec le même titre
+      const response = await adminService.getBooks({
+        limit: 1000 // Récupérer beaucoup de livres pour être sûr d'avoir tous les exemplaires
+      });
+      
+      let allBooks = [];
+      const responseData = response.data;
+      
+      if (responseData && Array.isArray(responseData.books)) {
+        allBooks = responseData.books;
+      } else if (Array.isArray(responseData)) {
+        allBooks = responseData;
+      }
+      
+      // Filtrer les livres avec le même titre (normalisation)
+      const currentTitle = book.title?.toLowerCase().trim();
+      const sameBooks = allBooks.filter(b => 
+        b.title?.toLowerCase().trim() === currentTitle && 
+        b.bibliotheque_id // Avoir une bibliothèque associée
+      );
+      
+      // Récupérer les IDs uniques des bibliothèques
+      const libraryIds = [...new Set(sameBooks.map(b => b.bibliotheque_id))];
+      
+      // Récupérer les détails des bibliothèques
+      const librariesResponse = await libraryService.getAll();
+      let allLibraries = [];
+      
+      const librariesData = librariesResponse.data;
+      if (librariesData && Array.isArray(librariesData.libraries)) {
+        allLibraries = librariesData.libraries;
+      } else if (Array.isArray(librariesData)) {
+        allLibraries = librariesData;
+      }
+      
+      // Filtrer les bibliothèques qui ont ce livre avec au moins 1 exemplaire disponible
+      const availableLibs = allLibraries.filter(lib => 
+        libraryIds.includes(lib.id)
+      ).map(lib => {
+        // Ajouter des informations supplémentaires sur les exemplaires
+        const booksInThisLib = sameBooks.filter(b => b.bibliotheque_id === lib.id);
+        const availableCount = booksInThisLib.filter(b => b.status === 'available').length;
+        const totalCount = booksInThisLib.length;
+        
+        return {
+          ...lib,
+          availableCount,
+          totalCount,
+          books: booksInThisLib
+        };
+      }).filter(lib => lib.availableCount > 0); // Garder seulement les bibliothèques avec au moins 1 livre disponible
+      
+      setAvailableLibraries(availableLibs);
+      
+    } catch (error) {
+      console.error('Erreur lors du chargement des bibliothèques:', error);
+    } finally {
+      setLoadingLibraries(false);
+    }
+  };
 
   const loadBookData = async () => {
     try {
@@ -323,6 +397,71 @@ const BookDetailPage = () => {
                 >
                   Voir tous les livres de cette bibliothèque →
                 </Link>
+              </div>
+            )}
+
+            {/* Section des bibliothèques où ce livre est disponible */}
+            {availableLibraries.length > 0 && (
+              <div className="bg-blue-50 rounded-lg p-6 mt-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                  <span className="mr-2">🏛️</span>
+                  Autres bibliothèques avec ce livre disponible ({availableLibraries.length})
+                </h3>
+                
+                {loadingLibraries ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader size="small" />
+                    <span className="ml-2 text-gray-600">Recherche en cours...</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {availableLibraries.map((lib) => (
+                      <div key={lib.id} className="bg-white rounded-lg p-4 border border-gray-200 hover:border-blue-300 transition-colors">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-medium text-gray-800 flex-1">{lib.name}</h4>
+                          <div className="text-right ml-3">
+                            <div className="text-sm font-medium text-green-600">
+                              {lib.availableCount} disponible{lib.availableCount > 1 ? 's' : ''}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              sur {lib.totalCount} exemplaire{lib.totalCount > 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1 text-sm text-gray-600 mb-3">
+                          <p className="flex items-center">
+                            <span className="mr-2">📍</span>
+                            {lib.adresse}
+                          </p>
+                          {lib.arrondissement && (
+                            <p className="flex items-center">
+                              <span className="mr-2">🗺️</span>
+                              {lib.arrondissement} arrondissement
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="flex justify-between items-center">
+                          <Link
+                            to={`/bibliotheque/${lib.id}`}
+                            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                          >
+                            Voir la bibliothèque →
+                          </Link>
+                          
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                            ✓ Disponible maintenant
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <div className="mt-4 text-xs text-gray-500 text-center">
+                  Ces bibliothèques ont des exemplaires disponibles du livre "{book?.title}"
+                </div>
               </div>
             )}
           </div>
