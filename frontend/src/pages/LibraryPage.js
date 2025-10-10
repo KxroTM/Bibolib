@@ -73,14 +73,25 @@ const LibraryPage = () => {
         genre: selectedGenre,
         availability: availability
       });
-      // Le backend renvoie actuellement un simple tableau (pas d'objet {books:[]})
-      const rawBooks = Array.isArray(booksResponse.data)
-        ? booksResponse.data
-        : (booksResponse.data?.books || []);
+      
+      // Traiter la réponse exactement comme pour les bibliothèques
+      const responseData = booksResponse.data;
+      let rawBooks = [];
+      let totalPagesFromResponse = 1;
+      
+      if (responseData && Array.isArray(responseData.books)) {
+        // Nouveau format avec pagination
+        rawBooks = responseData.books;
+        totalPagesFromResponse = responseData.totalPages || 1;
+      } else if (Array.isArray(responseData)) {
+        // Ancien format tableau simple
+        rawBooks = responseData;
+        totalPagesFromResponse = 1;
+      }
+      
       setBooks(rawBooks);
       setFilteredBooks(rawBooks);
-      // Fallback pagination (1 page si non fournie)
-      setTotalPages(booksResponse.data?.totalPages || 1);
+      setTotalPages(totalPagesFromResponse);
 
       // Charger les genres disponibles
       const genresResponse = await libraryService.getGenres(id);
@@ -157,7 +168,20 @@ const LibraryPage = () => {
       setSearching(true);
       
       const response = await libraryService.searchBooks(id, query);
-      setFilteredBooks(response.data);
+      
+      // Traiter la réponse exactement comme pour les bibliothèques
+      const responseData = response.data;
+      let searchResults = [];
+      
+      if (responseData && Array.isArray(responseData.books)) {
+        // Nouveau format avec pagination
+        searchResults = responseData.books;
+      } else if (Array.isArray(responseData)) {
+        // Ancien format tableau simple
+        searchResults = responseData;
+      }
+      
+      setFilteredBooks(searchResults);
     } catch (error) {
       console.error('Erreur lors de la recherche:', error);
       // Recherche locale en cas d'erreur
