@@ -220,6 +220,8 @@ func main() {
 		user := struct {
 			UserID   int    `json:"user_id"`
 			Username string `json:"username"`
+			BookID   int    `json:"book_id"`
+			Title    string `json:"title"`
 			IP       string `json:"ip"`
 		}{}
 		if err := c.ShouldBindJSON(&user); err != nil {
@@ -259,6 +261,7 @@ func main() {
 		defer cancel()
 		user := struct {
 			UserID   int    `json:"user_id"`
+			BookID   int    `json:"book_id"`
 			Username string `json:"username"`
 			IP       string `json:"ip"`
 		}{}
@@ -299,6 +302,8 @@ func main() {
 		defer cancel()
 		user := struct {
 			UserID   int    `json:"user_id"`
+			BookID   int    `json:"book_id"`
+			Title    string `json:"title"`
 			Username string `json:"username"`
 			IP       string `json:"ip"`
 		}{}
@@ -339,6 +344,7 @@ func main() {
 		defer cancel()
 		user := struct {
 			UserID   int    `json:"user_id"`
+			BookID   int    `json:"book_id"`
 			Username string `json:"username"`
 			IP       string `json:"ip"`
 		}{}
