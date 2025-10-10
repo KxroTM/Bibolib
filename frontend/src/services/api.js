@@ -100,7 +100,28 @@ export const libraryService = {
   },
   
   getBooks: (id, params = {}) => {
-    return api.get(`${API_CONFIG.endpoints.libraries}/${id}/books`, { params });
+    return api.get(`${API_CONFIG.endpoints.libraries}/${id}/books`, { params })
+      .then(res => {
+        // Nouveau backend renvoie {books, totalPages, currentPage, total}
+        if (res.data && Array.isArray(res.data.books)) {
+          return { data: res.data };
+        }
+        // Ancien format tableau simple
+        if (Array.isArray(res.data)) {
+          return {
+            data: {
+              books: res.data,
+              totalPages: 1,
+              currentPage: 1,
+              total: res.data.length
+            }
+          };
+        }
+        return res;
+      })
+      .catch(err => {
+        return { data: { books: [], totalPages: 1, currentPage: 1, total: 0 }, error: err };
+      });
   },
   
   getGenres: (id) => {
@@ -112,14 +133,42 @@ export const libraryService = {
   },
   
   searchBooks: (id, query) => {
-    return api.get(`${API_CONFIG.endpoints.libraries}/${id}/books/search`, { params: { q: query } });
+    return api.get(`${API_CONFIG.endpoints.libraries}/${id}/books/search`, { params: { q: query } })
+      .then(res => {
+        // Nouveau backend renvoie {books, totalPages, currentPage, total}
+        if (res.data && Array.isArray(res.data.books)) {
+          return { data: res.data.books };
+        }
+        // Ancien format tableau simple
+        if (Array.isArray(res.data)) {
+          return { data: res.data };
+        }
+        return { data: [] };
+      })
+      .catch(err => {
+        return { data: [], error: err };
+      });
   },
 };
 
 // Service des livres
 export const bookService = {
   search: (query, params = {}) => {
-    return api.get(API_CONFIG.endpoints.booksSearch, { params: { q: query, ...params } });
+    return api.get(API_CONFIG.endpoints.booksSearch, { params: { q: query, ...params } })
+      .then(res => {
+        // Nouveau backend renvoie {books, totalPages, currentPage, total}
+        if (res.data && Array.isArray(res.data.books)) {
+          return { data: res.data.books };
+        }
+        // Ancien format tableau simple
+        if (Array.isArray(res.data)) {
+          return { data: res.data };
+        }
+        return { data: [] };
+      })
+      .catch(err => {
+        return { data: [], error: err };
+      });
   },
   
   getById: (id) => {
@@ -149,8 +198,14 @@ export const adminService = {
   getBooks: (params = {}) => api.get(API_CONFIG.endpoints.books, { params })
     .then(res => {
       const data = res.data;
-      if (Array.isArray(data)) return { data };
-      if (data && Array.isArray(data.books)) return { data: data.books };
+      // Nouveau backend renvoie {books, totalPages, currentPage, total}
+      if (data && Array.isArray(data.books)) {
+        return { data: data.books, meta: { total: data.total, totalPages: data.totalPages, currentPage: data.currentPage } };
+      }
+      // Ancien format tableau simple
+      if (Array.isArray(data)) {
+        return { data };
+      }
       return { data: [] };
     })
     .catch(() => ({ data: [] })),

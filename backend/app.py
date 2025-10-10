@@ -20,6 +20,7 @@ from models import (
     get_book_by_id,
     create_book,
     update_book,
+    set_book_status,
     update_bibliotheque,
     delete_bibliotheque,
     update_user,
@@ -44,7 +45,9 @@ from models import (
     create_permission,
     get_permissions_for_role,
     user_has_permission,
-    assign_permission_to_role
+    assign_permission_to_role,
+    search_books_by_library,
+    get_books_by_bibliotheque_filtered
 )
 from models import get_user_by_username
 
@@ -380,8 +383,57 @@ def admin_alias_bibliotheques():
 
 @app.route("/books", methods=["GET"])
 def list_books():
-    books = get_all_books()
-    return jsonify(rows_to_dicts(books))
+    # Params pagination / filtre (même pattern que bibliotheques)
+    try:
+        page = int(request.args.get('page', '1'))
+        limit = int(request.args.get('limit', '50'))
+    except ValueError:
+        page, limit = 1, 50
+    if limit <= 0:
+        limit = 50
+    if page <= 0:
+        page = 1
+    offset = (page - 1) * limit
+    genre = request.args.get('genre', '').strip()
+    availability = request.args.get('availability', '').strip()
+
+    # Construire la requête avec filtres (même logique que bibliotheques)
+    base_sql = "SELECT * FROM book"
+    count_sql = "SELECT COUNT(*) as c FROM book"
+    params = {}
+    where_clauses = []
+    
+    if genre:
+        where_clauses.append("categorie = :genre")
+        params['genre'] = genre
+    if availability:
+        from models import _api_status_to_db_statut
+        statut_db = _api_status_to_db_statut(availability)
+        where_clauses.append("statut = :statut")
+        params['statut'] = statut_db
+    
+    if where_clauses:
+        where_sql = " WHERE " + " AND ".join(where_clauses)
+        base_sql += where_sql
+        count_sql += where_sql
+        
+    base_sql += " ORDER BY titre LIMIT :limit OFFSET :offset"
+    params['limit'] = limit
+    params['offset'] = offset
+
+    rows = db.session.execute(text(base_sql), params).fetchall()
+    total = db.session.execute(text(count_sql), params).fetchone()[0]
+    
+    # Convertir les lignes vers format API
+    from models import _book_row_to_api_dict
+    books_data = [_book_row_to_api_dict(row) for row in rows]
+    
+    return jsonify({
+        "books": books_data,
+        "currentPage": page,
+        "totalPages": (total // limit + (1 if total % limit else 0)) or 1,
+        "total": total
+    })
 
 @app.route("/books", methods=["POST"])
 @auth_required
@@ -391,16 +443,8 @@ def add_book():
     required = ["title", "author", "bibliotheque_id"]
     if not all(data.get(k) for k in required):
         return jsonify({"message": "Champs manquants"}), 400
-    # Normalisation des clés camelCase -> snake_case attendues
-    mapping = {
-        'coverImage': 'cover_image',
-        'downloadLink': 'download_link'
-    }
-    normalized = {}
-    for k, v in data.items():
-        target = mapping.get(k, k)
-        normalized[target] = v
-    new_book = create_book(**normalized)
+    # create_book accepte maintenant les clés API
+    new_book = create_book(**data)
     return jsonify(new_book), 201
 
 @app.route("/books/<int:book_id>", methods=["PUT"])
@@ -421,7 +465,7 @@ def edit_book(book_id):
 def get_book(book_id):
     book = get_book_by_id(book_id)
     if book:
-        return jsonify(dict(book))
+        return jsonify(book)
     return jsonify({"message": "Livre non trouvé"}), 404
 
 @app.route("/books/<int:book_id>", methods=["DELETE"])
@@ -437,16 +481,147 @@ def remove_book(book_id):
 # =============== Extended library/book endpoints expected by frontend ===============
 @app.route('/bibliotheques/<int:biblio_id>/books', methods=['GET'])
 def books_for_library(biblio_id):
-    books = get_books_by_bibliotheque(biblio_id)
-    return jsonify(rows_to_dicts(books))
+    # Params pagination / filtre (même pattern que bibliotheques)
+    try:
+        page = int(request.args.get('page', '1'))
+        limit = int(request.args.get('limit', '50'))
+    except ValueError:
+        page, limit = 1, 50
+    if limit <= 0:
+        limit = 50
+    if page <= 0:
+        page = 1
+    offset = (page - 1) * limit
+    genre = request.args.get('genre', '').strip()
+    availability = request.args.get('availability', '').strip()
+
+    # Construire la requête avec filtres
+    base_sql = "SELECT * FROM book WHERE bibliotheque_id = :bid"
+    count_sql = "SELECT COUNT(*) as c FROM book WHERE bibliotheque_id = :bid"
+    params = {"bid": biblio_id}
+    
+    if genre:
+        base_sql += " AND categorie = :genre"
+        count_sql += " AND categorie = :genre"
+        params['genre'] = genre
+    if availability:
+        from models import _api_status_to_db_statut
+        statut_db = _api_status_to_db_statut(availability)
+        base_sql += " AND statut = :statut"
+        count_sql += " AND statut = :statut"
+        params['statut'] = statut_db
+        
+    base_sql += " ORDER BY titre LIMIT :limit OFFSET :offset"
+    params['limit'] = limit
+    params['offset'] = offset
+
+    rows = db.session.execute(text(base_sql), params).fetchall()
+    total = db.session.execute(text(count_sql), {k: v for k, v in params.items() if k != 'limit' and k != 'offset'}).fetchone()[0]
+    
+    # Convertir les lignes vers format API
+    from models import _book_row_to_api_dict
+    books_data = [_book_row_to_api_dict(row) for row in rows]
+    
+    return jsonify({
+        "books": books_data,
+        "currentPage": page,
+        "totalPages": (total // limit + (1 if total % limit else 0)) or 1,
+        "total": total
+    })
+
+@app.route('/bibliotheques/<int:biblio_id>/books/search', methods=['GET'])
+def books_for_library_search(biblio_id):
+    q = request.args.get('q', '').strip()
+    if not q:
+        return jsonify({
+            "books": [],
+            "currentPage": 1,
+            "totalPages": 1,
+            "total": 0
+        })
+    
+    # Pagination pour la recherche dans une bibliothèque
+    try:
+        page = int(request.args.get('page', '1'))
+        limit = int(request.args.get('limit', '50'))
+    except ValueError:
+        page, limit = 1, 50
+    if limit <= 0:
+        limit = 50
+    if page <= 0:
+        page = 1
+    offset = (page - 1) * limit
+    
+    # Recherche avec pagination dans une bibliothèque
+    like = f"%{q}%"
+    base_sql = "SELECT * FROM book WHERE bibliotheque_id = :bid AND (titre LIKE :q OR auteur LIKE :q)"
+    count_sql = "SELECT COUNT(*) as c FROM book WHERE bibliotheque_id = :bid AND (titre LIKE :q OR auteur LIKE :q)"
+    params = {"bid": biblio_id, "q": like}
+    
+    base_sql += " ORDER BY titre LIMIT :limit OFFSET :offset"
+    params['limit'] = limit
+    params['offset'] = offset
+    
+    rows = db.session.execute(text(base_sql), params).fetchall()
+    total = db.session.execute(text(count_sql), {"bid": biblio_id, "q": like}).fetchone()[0]
+    
+    # Convertir les lignes vers format API
+    from models import _book_row_to_api_dict
+    books_data = [_book_row_to_api_dict(row) for row in rows]
+    
+    return jsonify({
+        "books": books_data,
+        "currentPage": page,
+        "totalPages": (total // limit + (1 if total % limit else 0)) or 1,
+        "total": total
+    })
 
 @app.route('/books/search', methods=['GET'])
 def search_books_endpoint():
     q = request.args.get('q', '').strip()
     if not q:
-        return jsonify([])
-    results = search_books(q)
-    return jsonify(rows_to_dicts(results))
+        return jsonify({
+            "books": [],
+            "currentPage": 1,
+            "totalPages": 1,
+            "total": 0
+        })
+    
+    # Pagination pour la recherche
+    try:
+        page = int(request.args.get('page', '1'))
+        limit = int(request.args.get('limit', '50'))
+    except ValueError:
+        page, limit = 1, 50
+    if limit <= 0:
+        limit = 50
+    if page <= 0:
+        page = 1
+    offset = (page - 1) * limit
+    
+    # Recherche avec pagination
+    like = f"%{q}%"
+    base_sql = "SELECT * FROM book WHERE titre LIKE :q OR auteur LIKE :q"
+    count_sql = "SELECT COUNT(*) as c FROM book WHERE titre LIKE :q OR auteur LIKE :q"
+    params = {"q": like}
+    
+    base_sql += " ORDER BY titre LIMIT :limit OFFSET :offset"
+    params['limit'] = limit
+    params['offset'] = offset
+    
+    rows = db.session.execute(text(base_sql), params).fetchall()
+    total = db.session.execute(text(count_sql), {"q": like}).fetchone()[0]
+    
+    # Convertir les lignes vers format API
+    from models import _book_row_to_api_dict
+    books_data = [_book_row_to_api_dict(row) for row in rows]
+    
+    return jsonify({
+        "books": books_data,
+        "currentPage": page,
+        "totalPages": (total // limit + (1 if total % limit else 0)) or 1,
+        "total": total
+    })
 
 @app.route('/bibliotheques/arrondissements', methods=['GET'])
 def list_arrondissements():
@@ -467,13 +642,13 @@ def reserve(book_id):
     book = get_book_by_id(book_id)
     if not book:
         return jsonify({'message': 'Livre non trouvé'}), 404
-    # Check availability
-    if book['status'] != 'disponible':
+    # Check availability (API status 'available')
+    if book.get('status') != 'available':
         return jsonify({'message': 'Livre non disponible pour réservation'}), 400
     due_date = datetime.now(timezone.utc) + timedelta(days=3)
     reserve_book(request.current_user['id'], book_id, due_date)
     updated = get_book_by_id(book_id)
-    return jsonify({'message': 'Livre réservé', 'book': dict(updated)})
+    return jsonify({'message': 'Livre réservé', 'book': updated})
 
 @app.route('/books/<int:book_id>/borrow', methods=['POST'])
 @auth_required
@@ -483,19 +658,15 @@ def borrow(book_id):
         return jsonify({'message': 'Livre non trouvé'}), 404
     # Allow borrow if disponible or already reserved by user
     reservation = get_reservation_for_book(book_id)
-    if book['status'] == 'emprunte':
+    if book.get('status') == 'borrowed':
         return jsonify({'message': 'Déjà emprunté'}), 400
-    # If reserved by another user, block
-    if book['status'] != 'disponible' and reservation and reservation['user_id'] != request.current_user['id']:
+    # If reserved by another user, block (status not available and reservation exists for someone else)
+    if book.get('status') != 'available' and reservation and reservation['user_id'] != request.current_user['id']:
         return jsonify({'message': 'Réservé par un autre utilisateur'}), 403
-    # Borrow: mark directly
-    db.session.execute(
-        text("UPDATE books SET status = 'emprunte' WHERE id = :bid"),
-        {"bid": book_id}
-    )
-    db.session.commit()
+    # Borrow: mark directly via statut mapping
+    set_book_status(book_id, 'borrowed')
     updated = get_book_by_id(book_id)
-    return jsonify({'message': 'Livre emprunté', 'book': dict(updated)})
+    return jsonify({'message': 'Livre emprunté', 'book': updated})
 
 @app.route('/books/<int:book_id>/return', methods=['POST'])
 @auth_required
@@ -503,7 +674,7 @@ def return_book_endpoint(book_id):
     book = get_book_by_id(book_id)
     if not book:
         return jsonify({'message': 'Livre non trouvé'}), 404
-    if book['status'] != 'emprunte':
+    if book.get('status') != 'borrowed':
         return jsonify({'message': 'Livre non emprunté'}), 400
     # Simplistic: find reservation row and mark returned now if exists
     res = get_reservation_for_book(book_id)
@@ -511,13 +682,9 @@ def return_book_endpoint(book_id):
         return_book(res['id'])
     else:
         # Just set status available
-        db.session.execute(
-            text("UPDATE books SET status='disponible' WHERE id=:bid"),
-            {"bid": book_id}
-        )
-        db.session.commit()
+        set_book_status(book_id, 'available')
     updated = get_book_by_id(book_id)
-    return jsonify({'message': 'Livre retourné', 'book': dict(updated)})
+    return jsonify({'message': 'Livre retourné', 'book': updated})
 
 def seed_admin():
     """Idempotent admin seeding: ensures admin user, role, and permission mapping exist."""

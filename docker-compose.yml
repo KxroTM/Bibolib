@@ -1,23 +1,23 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: bibolib-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: bibolib
-      MYSQL_USER: bibolib_user
-      MYSQL_PASSWORD: bibolib_password
-    ports:
-      - "3307:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./bibolib.sql:/docker-entrypoint-initdb.d/bibolib.sql
-    networks:
-      - appnet
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
-      retries: 10
+  # mysql:
+  #   image: mysql:8.0
+  #   container_name: bibolib-mysql
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: rootpassword
+  #     MYSQL_DATABASE: bibolib
+  #     MYSQL_USER: bibolib_user
+  #     MYSQL_PASSWORD: bibolib_password
+  #   ports:
+  #     - "3307:3306"
+  #   volumes:
+  #     - mysql_data:/var/lib/mysql
+  #     - ./bibolib.sql:/docker-entrypoint-initdb.d/bibolib.sql
+  #   networks:
+  #     - appnet
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+  #     timeout: 20s
+  #     retries: 10
 
   activity_logs:
     build:
@@ -37,8 +37,6 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      mysql:
-        condition: service_healthy
       activity_logs:
         condition: service_started
     networks:
@@ -46,7 +44,9 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=mysql+pymysql://bibolib_user:bibolib_password@mysql:3306/bibolib
+      - DATABASE_URL=mysql+pymysql://root:@host.docker.internal:3306/bibolib
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   frontend:
     build:
@@ -64,8 +64,8 @@ services:
     env_file:
       - .env
 
-volumes:
-  mysql_data:
+# volumes:
+#   mysql_data:
 
 networks:
   appnet:

@@ -16,7 +16,7 @@ const AdminDashboard = () => {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 1000; // Limite très élevée pour afficher tous les livres
 
   const readOnly = false;
 
@@ -86,11 +86,24 @@ const AdminDashboard = () => {
         page: currentPage,
         limit: itemsPerPage
       });
-      // Backend actuel renvoie un tableau simple de livres
-      const raw = response.data;
-      const list = Array.isArray(raw) ? raw : (raw.books || []);
-      setBooks(list);
-      setTotalPages(raw.totalPages || 1);
+      
+      // Traiter la réponse exactement comme pour les bibliothèques
+      const responseData = response.data;
+      let rawBooks = [];
+      let totalPagesFromResponse = 1;
+      
+      if (responseData && Array.isArray(responseData.books)) {
+        // Nouveau format avec pagination
+        rawBooks = responseData.books;
+        totalPagesFromResponse = responseData.totalPages || 1;
+      } else if (Array.isArray(responseData)) {
+        // Ancien format tableau simple
+        rawBooks = responseData;
+        totalPagesFromResponse = 1;
+      }
+      
+      setBooks(rawBooks);
+      setTotalPages(totalPagesFromResponse);
     } catch (error) {
       console.error('Erreur lors du chargement des livres:', error);
       toast.error('Erreur lors du chargement des livres');

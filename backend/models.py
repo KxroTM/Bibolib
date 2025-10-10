@@ -235,82 +235,236 @@ def delete_bibliotheque(biblio_id):
     db.session.commit()
 
 # ==========================
-# Livres
+# Livres (table `book`)
 # ==========================
-def create_book(title, author, bibliotheque_id, published_at=None, status='disponible', cover_image=None, download_link=None, description=None, summary=None, genre=None, isbn=None, pages=None, language=None, publisher=None):
-    db.session.execute(
-        text("""
-            INSERT INTO books (title, author, bibliotheque_id, published_at, status, cover_image, download_link, description, summary, genre, isbn, pages, language, publisher)
-            VALUES (:title, :author, :bibliotheque_id, :published_at, :status, :cover_image, :download_link, :description, :summary, :genre, :isbn, :pages, :language, :publisher)
-        """),
-        {"title": title, "author": author, "bibliotheque_id": bibliotheque_id, "published_at": published_at, "status": status or 'disponible',
-         "cover_image": cover_image, "download_link": download_link, "description": description, "summary": summary, "genre": genre,
-         "isbn": isbn, "pages": pages, "language": language, "publisher": publisher}
-    )
+
+# Helper: conversion des données book (DB fr) vers format API (en)
+def _book_row_to_api_dict(row):
+    """Convertit une ligne de la table book vers le format attendu par l'API frontend"""
+    if not row:
+        return None
+    r = _row_to_dict(row)
+    if not r:
+        return None
+    return {
+        "id": r.get("livre_id"),
+        "title": r.get("titre"),
+        "author": r.get("auteur"),
+        "publisher": r.get("editeur"),
+        "description": r.get("resume"),
+        "genre": r.get("categorie"),
+        "year": r.get("annee"),
+        "isbn": r.get("isbn"),
+        "language": r.get("langue"),
+        "status": _db_statut_to_api_status(r.get("statut")),
+        "bibliotheque_id": r.get("bibliotheque_id"),
+        "pages": r.get("pages"),
+        "coverImage": r.get("image_url")
+    }
+
+# Helper: conversion statut DB (fr) vers status API (en)
+def _db_statut_to_api_status(statut):
+    """Convertit le statut français de la DB vers le status anglais de l'API"""
+    if not statut:
+        return 'available'
+    s = statut.lower().strip()
+    if s == 'disponible':
+        return 'available'
+    elif s == 'réservé':
+        return 'reserved'
+    elif s == 'emprunté':
+        return 'borrowed'
+    return 'available'
+
+# Helper: conversion status API (en) vers statut DB (fr)
+def _api_status_to_db_statut(status):
+    """Convertit le status anglais de l'API vers le statut français de la DB"""
+    if not status:
+        return 'Disponible'
+    s = status.lower().strip()
+    if s == 'available':
+        return 'Disponible'
+    elif s == 'reserved':
+        return 'Réservé'
+    elif s == 'borrowed':
+        return 'Emprunté'
+    return 'Disponible'
+
+def create_book(**kwargs):
+    """Crée un livre avec les paramètres fournis (format API ou DB)"""
+    # Mapping des clés API vers DB
+    api_to_db = {
+        'title': 'titre',
+        'author': 'auteur',
+        'publisher': 'editeur',
+        'description': 'resume',
+        'genre': 'categorie',
+        'year': 'annee',
+        'isbn': 'isbn',
+        'language': 'langue',
+        'status': 'statut',
+        'bibliotheque_id': 'bibliotheque_id',
+        'pages': 'pages',
+        'coverImage': 'image_url'
+    }
+    
+    # Préparer les paramètres pour la DB
+    db_params = {}
+    for api_key, db_key in api_to_db.items():
+        if api_key in kwargs and kwargs[api_key] is not None:
+            if api_key == 'status':
+                db_params[db_key] = _api_status_to_db_statut(kwargs[api_key])
+            else:
+                db_params[db_key] = kwargs[api_key]
+        elif db_key in kwargs and kwargs[db_key] is not None:
+            db_params[db_key] = kwargs[db_key]
+    
+    # Construire la requête dynamiquement
+    if db_params:
+        columns = list(db_params.keys())
+        placeholders = [f":{col}" for col in columns]
+        sql = f"INSERT INTO book ({', '.join(columns)}) VALUES ({', '.join(placeholders)})"
+        db.session.execute(text(sql), db_params)
+    else:
+        # Insertion minimale
+        db.session.execute(text("INSERT INTO book () VALUES ()"))
+    
     db.session.commit()
-    # Retourner le dernier livre inséré (simpliste)
-    row = db.session.execute(text("SELECT * FROM books ORDER BY id DESC LIMIT 1")).fetchone()
-    return _row_to_dict(row)
+    
+    # Retourner le dernier livre inséré
+    row = db.session.execute(text("SELECT * FROM book ORDER BY livre_id DESC LIMIT 1")).fetchone()
+    return _book_row_to_api_dict(row)
 
 def update_book(book_id, **fields):
+    """Met à jour un livre"""
     if not fields:
         return
-    allowed = {"title", "author", "published_at", "status", "bibliotheque_id"}
-    set_parts = []
-    params = {"id": book_id}
-    for k, v in fields.items():
-        if k in allowed:
-            set_parts.append(f"{k} = :{k}")
-            params[k] = v
-    if not set_parts:
+    
+    # Mapping des clés API vers DB
+    api_to_db = {
+        'title': 'titre',
+        'author': 'auteur',
+        'publisher': 'editeur',
+        'description': 'resume',
+        'genre': 'categorie',
+        'year': 'annee',
+        'isbn': 'isbn',
+        'language': 'langue',
+        'status': 'statut',
+        'bibliotheque_id': 'bibliotheque_id',
+        'pages': 'pages',
+        'coverImage': 'image_url'
+    }
+    
+    db_updates = {}
+    for api_key, db_key in api_to_db.items():
+        if api_key in fields and fields[api_key] is not None:
+            if api_key == 'status':
+                db_updates[db_key] = _api_status_to_db_statut(fields[api_key])
+            else:
+                db_updates[db_key] = fields[api_key]
+        elif db_key in fields and fields[db_key] is not None:
+            db_updates[db_key] = fields[db_key]
+    
+    if not db_updates:
         return
-    sql = f"UPDATE books SET {', '.join(set_parts)} WHERE id = :id"
-    db.session.execute(text(sql), params)
+        
+    set_parts = [f"{k} = :{k}" for k in db_updates.keys()]
+    db_updates["id"] = book_id
+    sql = f"UPDATE book SET {', '.join(set_parts)} WHERE livre_id = :id"
+    db.session.execute(text(sql), db_updates)
     db.session.commit()
 
 def delete_book(book_id):
-    db.session.execute(
-            text("DELETE FROM books WHERE id = :id"),
-            {"id": book_id}
-        )
+    """Supprime un livre"""
+    db.session.execute(text("DELETE FROM book WHERE livre_id = :id"), {"id": book_id})
     db.session.commit()
 
 def get_book_by_id(book_id):
+    """Récupère un livre par son ID"""
     row = db.session.execute(
-        text("SELECT * FROM books WHERE id = :id"),
+        text("SELECT * FROM book WHERE livre_id = :id"),
         {"id": book_id}
     ).fetchone()
-    return _row_to_dict(row)
+    return _book_row_to_api_dict(row)
 
 def get_all_books():
-    return db.session.execute(text("SELECT * FROM books")).fetchall()
+    """Récupère tous les livres"""
+    rows = db.session.execute(text("SELECT * FROM book")).fetchall()
+    return [_book_row_to_api_dict(row) for row in rows]
 
 def get_books_by_bibliotheque(biblio_id):
-    return db.session.execute(
-            text("SELECT * FROM books WHERE bibliotheque_id = :biblio_id"),
-            {"biblio_id": biblio_id}
-        ).fetchall()
+    """Récupère tous les livres d'une bibliothèque"""
+    rows = db.session.execute(
+        text("SELECT * FROM book WHERE bibliotheque_id = :biblio_id"),
+        {"biblio_id": biblio_id}
+    ).fetchall()
+    return [_book_row_to_api_dict(row) for row in rows]
 
 def get_book_by_bibliotheque_and_id(biblio_id, book_id):
+    """Récupère un livre spécifique d'une bibliothèque"""
     row = db.session.execute(
-        text("SELECT * FROM books WHERE bibliotheque_id = :biblio_id AND id = :book_id"),
+        text("SELECT * FROM book WHERE bibliotheque_id = :biblio_id AND livre_id = :book_id"),
         {"biblio_id": biblio_id, "book_id": book_id}
     ).fetchone()
-    return _row_to_dict(row)
+    return _book_row_to_api_dict(row)
 
 def get_book_by_bibliotheque_and_title(biblio_id, title):
+    """Récupère un livre par titre dans une bibliothèque"""
     row = db.session.execute(
-        text("SELECT * FROM books WHERE bibliotheque_id = :biblio_id AND title = :title"),
+        text("SELECT * FROM book WHERE bibliotheque_id = :biblio_id AND titre = :title"),
         {"biblio_id": biblio_id, "title": title}
     ).fetchone()
-    return _row_to_dict(row)
+    return _book_row_to_api_dict(row)
 
 def search_books(term):
+    """Recherche globale de livres"""
     like = f"%{term}%"
-    return db.session.execute(
-            text("SELECT * FROM books WHERE title LIKE :q OR author LIKE :q"),
-            {"q": like}
-        ).fetchall()
+    rows = db.session.execute(
+        text("SELECT * FROM book WHERE titre LIKE :q OR auteur LIKE :q"),
+        {"q": like}
+    ).fetchall()
+    return [_book_row_to_api_dict(row) for row in rows]
+
+def search_books_by_library(biblio_id, term):
+    """Recherche de livres dans une bibliothèque spécifique"""
+    like = f"%{term}%"
+    rows = db.session.execute(
+        text("SELECT * FROM book WHERE bibliotheque_id = :bid AND (titre LIKE :q OR auteur LIKE :q)"),
+        {"bid": biblio_id, "q": like}
+    ).fetchall()
+    return [_book_row_to_api_dict(row) for row in rows]
+
+def get_books_by_bibliotheque_filtered(biblio_id, genre=None, availability=None, page=None, limit=None):
+    """Récupère les livres d'une bibliothèque avec filtres"""
+    where_clauses = ["bibliotheque_id = :bid"]
+    params = {"bid": biblio_id}
+    
+    if genre:
+        where_clauses.append("categorie = :genre")
+        params["genre"] = genre
+        
+    if availability:
+        statut_db = _api_status_to_db_statut(availability)
+        where_clauses.append("statut = :statut")
+        params["statut"] = statut_db
+    
+    where_sql = " AND ".join(where_clauses)
+    sql = f"SELECT * FROM book WHERE {where_sql} ORDER BY titre"
+    
+    if page and limit:
+        try:
+            p = int(page)
+            l = int(limit)
+            if p > 0 and l > 0:
+                sql += " LIMIT :limit OFFSET :offset"
+                params["limit"] = l
+                params["offset"] = (p - 1) * l
+        except Exception:
+            pass
+    
+    rows = db.session.execute(text(sql), params).fetchall()
+    return [_book_row_to_api_dict(row) for row in rows]
 
 def get_arrondissements():
     # Retourne la vraie colonne arrondissement (distinct, tri numérique si possible)
@@ -319,13 +473,14 @@ def get_arrondissements():
     ).fetchall()
 
 def get_genres_for_bibliotheque(biblio_id):
-    # Assuming a 'genre' column could exist in future; placeholder returns unique authors as pseudo-genres
+    """Récupère les genres disponibles dans une bibliothèque"""
     return db.session.execute(
-            text("SELECT DISTINCT author as genre FROM books WHERE bibliotheque_id = :bid"),
-            {"bid": biblio_id}
-        ).fetchall()
+        text("SELECT DISTINCT categorie FROM book WHERE bibliotheque_id = :bid AND categorie IS NOT NULL AND categorie <> ''"),
+        {"bid": biblio_id}
+    ).fetchall()
 
 def get_reservation_for_book(book_id):
+    """Récupère la réservation active d'un livre"""
     row = db.session.execute(
         text("SELECT * FROM reservations WHERE book_id = :bid AND returned_at IS NULL ORDER BY reserved_at DESC LIMIT 1"),
         {"bid": book_id}
@@ -337,29 +492,41 @@ def get_reservation_for_book(book_id):
 # Reservations
 # ==========================
 def reserve_book(user_id, book_id, due_date):
+    """Réserve un livre"""
     db.session.execute(
         text("INSERT INTO reservations (user_id, book_id, reserved_at, due_date) VALUES (:user_id, :book_id, :reserved_at, :due_date)"),
         {"user_id": user_id, "book_id": book_id, "reserved_at": datetime.utcnow(), "due_date": due_date}
     )
+    # Met à jour le statut du livre
     db.session.execute(
-        text("UPDATE books SET status = 'emprunte' WHERE id = :id"),
+        text("UPDATE book SET statut = 'Réservé' WHERE livre_id = :id"),
         {"id": book_id}
     )
     db.session.commit()
 
 def return_book(reservation_id):
+    """Retourne un livre"""
     db.session.execute(
-            text("UPDATE reservations SET returned_at = :returned_at WHERE id = :id"),
-            {"returned_at": datetime.utcnow(), "id": reservation_id}
-        )
-    # Update book status
+        text("UPDATE reservations SET returned_at = :returned_at WHERE id = :id"),
+        {"returned_at": datetime.utcnow(), "id": reservation_id}
+    )
+    # Met à jour le statut du livre
     book_id = db.session.execute(
         text("SELECT book_id FROM reservations WHERE id = :id"),
         {"id": reservation_id}
     ).fetchone()["book_id"]
     db.session.execute(
-        text("UPDATE books SET status = 'disponible' WHERE id = :id"),
+        text("UPDATE book SET statut = 'Disponible' WHERE livre_id = :id"),
         {"id": book_id}
+    )
+    db.session.commit()
+
+def set_book_status(book_id, status):
+    """Met à jour le statut d'un livre (utilise le format API)"""
+    statut_db = _api_status_to_db_statut(status)
+    db.session.execute(
+        text("UPDATE book SET statut = :statut WHERE livre_id = :id"),
+        {"statut": statut_db, "id": book_id}
     )
     db.session.commit()
 
@@ -433,31 +600,29 @@ def create_all_tables():
     """))
 
     # ==========================
-    # Livres
+    # Livres (table book)
     # ==========================
     conn.execute(text("""
-    CREATE TABLE IF NOT EXISTS books (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        title VARCHAR(255) NOT NULL,
-        author VARCHAR(255) NOT NULL,
-        published_at DATE,
-        status ENUM('disponible','emprunte') DEFAULT 'disponible',
-        bibliotheque_id INT,
-        cover_image VARCHAR(500),
-        download_link VARCHAR(500),
-        description TEXT,
-        summary TEXT,
-        genre VARCHAR(100),
+    CREATE TABLE IF NOT EXISTS book (
+        livre_id INT AUTO_INCREMENT PRIMARY KEY,
+        image_url VARCHAR(255),
+        titre TEXT,
+        auteur VARCHAR(255),
+        editeur VARCHAR(255),
+        resume TEXT,
+        categorie VARCHAR(255),
+        annee TEXT,
         isbn VARCHAR(50),
-        pages INT,
-        language VARCHAR(100),
-        publisher VARCHAR(255),
-        FOREIGN KEY(bibliotheque_id) REFERENCES bibliotheques(id) ON DELETE SET NULL
+        langue VARCHAR(50),
+        statut VARCHAR(50) DEFAULT 'Disponible',
+        bibliotheque_id INT,
+        pages INT DEFAULT NULL,
+        CONSTRAINT fk_book_bibliotheque FOREIGN KEY (bibliotheque_id) REFERENCES bibliotheques(id) ON DELETE SET NULL
     )
     """))
 
     # ==========================
-    # Reservations
+    # Reservations (mise à jour FK vers book)
     # ==========================
     conn.execute(text("""
     CREATE TABLE IF NOT EXISTS reservations (
@@ -468,9 +633,40 @@ def create_all_tables():
         due_date DATETIME NOT NULL,
         returned_at DATETIME,
         FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY(book_id) REFERENCES books(id) ON DELETE CASCADE
+        FOREIGN KEY(book_id) REFERENCES book(livre_id) ON DELETE CASCADE
     )
     """))
+    
+    # ==========================
+    # Migration: copier books existants vers book (une seule fois)
+    # ==========================
+    try:
+        # Vérifier si l'ancienne table books existe et si book est vide
+        books_exists = conn.execute(
+            text("SELECT COUNT(*) as c FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'books'")
+        ).fetchone()["c"] > 0
+        
+        book_count = conn.execute(text("SELECT COUNT(*) as c FROM book")).fetchone()["c"]
+        
+        if books_exists and book_count == 0:
+            # Migration des données
+            conn.execute(text("""
+                INSERT INTO book (titre, auteur, statut, bibliotheque_id)
+                SELECT 
+                    title as titre,
+                    author as auteur,
+                    CASE status 
+                        WHEN 'disponible' THEN 'Disponible'
+                        WHEN 'emprunte' THEN 'Emprunté'
+                        ELSE 'Disponible'
+                    END as statut,
+                    bibliotheque_id
+                FROM books
+            """))
+            print("[Migration] Données copiées de books vers book")
+    except Exception as e:
+        # Migration best-effort, ignore les erreurs
+        print(f"[Migration] Erreur ignorée: {e}")
 
     conn.commit()
 
