@@ -21,6 +21,7 @@ const BooksPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [allBooks, setAllBooks] = useState([]); // Pour stocker tous les livres
+  const [booksQuery, setBooksQuery] = useState('');
   const itemsPerPage = 20; // 20 livres par page pour une bonne expérience utilisateur
 
   const loadBooks = async () => {
@@ -62,27 +63,11 @@ const BooksPage = () => {
       
       console.log('🔄 Livres après déduplication:', uniqueBooks.length);
       
-      // Stocker tous les livres uniques
-      setAllBooks(uniqueBooks);
+  // Stocker tous les livres uniques (la pagination et le filtrage
+  // se feront côté client dans un useEffect séparé)
+  setAllBooks(uniqueBooks);
       
-      // Calculer la pagination côté client
-      const totalItems = uniqueBooks.length;
-      const totalPagesCalc = Math.ceil(totalItems / itemsPerPage);
-      setTotalPages(totalPagesCalc);
-      
-      // Extraire les livres pour la page actuelle
-      const startIndex = (currentPage - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const booksForCurrentPage = uniqueBooks.slice(startIndex, endIndex);
-      
-      setBooks(booksForCurrentPage);
-      
-      console.log('� Page actuelle:', {
-        page: currentPage,
-        total: totalItems,
-        totalPages: totalPagesCalc,
-        showing: booksForCurrentPage.length
-      });
+      console.log('🔢 Livres stockés en local :', uniqueBooks.length);
       
     } catch (error) {
       console.error('❌ Erreur lors du chargement des livres:', error);
@@ -111,18 +96,42 @@ const BooksPage = () => {
     }
   }, [location.pathname, location.search]); // Se déclenche à chaque changement d'URL complet
 
+  // Quand allBooks, currentPage ou booksQuery change, recalculer le filtrage et la pagination
   useEffect(() => {
-    // Charger tous les livres seulement une fois
     if (allBooks.length === 0) {
       loadBooks();
-    } else {
-      // Si on a déjà tous les livres, juste mettre à jour la pagination
-      const startIndex = (currentPage - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const booksForCurrentPage = allBooks.slice(startIndex, endIndex);
-      setBooks(booksForCurrentPage);
+      return;
     }
-  }, [currentPage, allBooks]);
+
+    const q = booksQuery?.toLowerCase().trim();
+    const filtered = q
+      ? allBooks.filter(b => {
+          return (b.title || '').toLowerCase().includes(q)
+            || (b.author || '').toLowerCase().includes(q)
+            || (b.genre || '').toLowerCase().includes(q)
+            || (b.isbn || '').toLowerCase().includes(q);
+        })
+      : allBooks;
+
+    const totalItems = filtered.length;
+    const totalPagesCalc = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    setTotalPages(totalPagesCalc);
+
+    // Valider currentPage
+    const page = Math.min(Math.max(1, currentPage), totalPagesCalc);
+    setCurrentPage(page);
+
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const booksForCurrentPage = filtered.slice(startIndex, endIndex);
+    setBooks(booksForCurrentPage);
+  }, [allBooks, currentPage, booksQuery]);
+
+  const onBooksSearch = (e) => {
+    e && e.preventDefault && e.preventDefault();
+    setCurrentPage(1);
+    // le filtrage est automatique via booksQuery
+  };
 
   const handlePageChange = (page) => {
     // Ne pas mettre à jour si on est déjà sur cette page
@@ -171,6 +180,13 @@ const BooksPage = () => {
       </div>
 
       <div>
+        <div className="mb-6">
+          <form onSubmit={onBooksSearch} className="flex gap-2">
+            <input className="input flex-1" placeholder="Rechercher par titre, auteur, genre ou ISBN..." value={booksQuery} onChange={e=>setBooksQuery(e.target.value)} />
+            <button className="btn" type="submit">Rechercher</button>
+            <button type="button" className="btn" onClick={()=>{ setBooksQuery(''); setCurrentPage(1); }}>Réinitialiser</button>
+          </form>
+        </div>
         {books.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">📚</div>

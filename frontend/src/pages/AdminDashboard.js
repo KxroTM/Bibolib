@@ -12,6 +12,8 @@ const AdminDashboard = () => {
   const [admins, setAdmins] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [bookQuery, setBookQuery] = useState('');
+  const [libraryQuery, setLibraryQuery] = useState('');
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -37,6 +39,9 @@ const AdminDashboard = () => {
     libraryId: ''
   });
 
+  // Edition en cours
+  const [editingBookId, setEditingBookId] = useState(null);
+
   // Formulaire bibliothèque
   const [libraryForm, setLibraryForm] = useState({
     name: '',
@@ -48,6 +53,9 @@ const AdminDashboard = () => {
     description: '',
     website: ''
   });
+
+  // Edition bibliothèque
+  const [editingLibraryId, setEditingLibraryId] = useState(null);
 
   // Formulaire admin
   const [adminForm, setAdminForm] = useState({
@@ -82,10 +90,9 @@ const AdminDashboard = () => {
 
   const loadBooks = async () => {
     try {
-      const response = await adminService.getBooks({
-        page: currentPage,
-        limit: itemsPerPage
-      });
+      const params = { page: currentPage, limit: itemsPerPage };
+      if (bookQuery) params.q = bookQuery;
+      const response = await adminService.getBooks(params);
       
       // Traiter la réponse exactement comme pour les bibliothèques
       const responseData = response.data;
@@ -112,7 +119,9 @@ const AdminDashboard = () => {
 
   const loadLibraries = async () => {
     try {
-      const response = await adminService.getLibraries();
+      const params = {};
+      if (libraryQuery) params.q = libraryQuery;
+      const response = await adminService.getLibraries(params);
       const raw = response.data;
       const list = Array.isArray(raw) ? raw : (raw.libraries || raw.bibliotheques || []);
       setLibraries(list || []);
@@ -120,6 +129,17 @@ const AdminDashboard = () => {
       console.error('Erreur lors du chargement des bibliothèques:', error);
       toast.error('Erreur lors du chargement des bibliothèques');
     }
+  };
+
+  const onBookSearch = (e) => {
+    e.preventDefault();
+    setCurrentPage(1);
+    loadBooks();
+  };
+
+  const onLibrarySearch = (e) => {
+    e.preventDefault();
+    loadLibraries();
   };
 
   const loadAdmins = async () => {
@@ -144,24 +164,46 @@ const AdminDashboard = () => {
     e.preventDefault();
     if (!bookForm.title || !bookForm.author || !bookForm.libraryId) return toast.error('Champs requis manquants');
     try {
-      await adminService.createBook({
-        title: bookForm.title,
-        author: bookForm.author,
-        bibliotheque_id: parseInt(bookForm.libraryId,10),
-        published_at: bookForm.published_at || null,
-        genre: bookForm.genre || null,
-        isbn: bookForm.isbn || null,
-        pages: bookForm.pages ? parseInt(bookForm.pages,10) : null,
-        language: bookForm.language || null,
-        publisher: bookForm.publisher || null,
-        description: bookForm.description || null,
-        summary: bookForm.summary || null,
-        coverImage: bookForm.coverImage || null,
-        downloadLink: bookForm.downloadLink || null
-      });
-      toast.success('Livre créé');
-      resetBookForm();
-      loadBooks();
+      if (editingBookId) {
+        await adminService.updateBook(editingBookId, {
+          title: bookForm.title,
+          author: bookForm.author,
+          bibliotheque_id: parseInt(bookForm.libraryId,10),
+          published_at: bookForm.published_at || null,
+          genre: bookForm.genre || null,
+          isbn: bookForm.isbn || null,
+          pages: bookForm.pages ? parseInt(bookForm.pages,10) : null,
+          language: bookForm.language || null,
+          publisher: bookForm.publisher || null,
+          description: bookForm.description || null,
+          summary: bookForm.summary || null,
+          coverImage: bookForm.coverImage || null,
+          downloadLink: bookForm.downloadLink || null
+        });
+        toast.success('Livre mis à jour');
+        setEditingBookId(null);
+        resetBookForm();
+        loadBooks();
+      } else {
+        await adminService.createBook({
+          title: bookForm.title,
+          author: bookForm.author,
+          bibliotheque_id: parseInt(bookForm.libraryId,10),
+          published_at: bookForm.published_at || null,
+          genre: bookForm.genre || null,
+          isbn: bookForm.isbn || null,
+          pages: bookForm.pages ? parseInt(bookForm.pages,10) : null,
+          language: bookForm.language || null,
+          publisher: bookForm.publisher || null,
+          description: bookForm.description || null,
+          summary: bookForm.summary || null,
+          coverImage: bookForm.coverImage || null,
+          downloadLink: bookForm.downloadLink || null
+        });
+        toast.success('Livre créé');
+        resetBookForm();
+        loadBooks();
+      }
     } catch(err){ console.error(err); toast.error('Création livre échouée'); }
   };
 
@@ -170,20 +212,73 @@ const AdminDashboard = () => {
     try { await adminService.deleteBook(id); toast.info('Livre supprimé'); loadBooks(); } catch (e) { console.error(e); toast.error('Suppression échouée'); }
   };
 
+  const startEditBook = (book) => {
+    setEditingBookId(book.id);
+    setBookForm({
+      title: book.title || '',
+      author: book.author || '',
+      published_at: book.published_at || book.year || '',
+      genre: book.genre || '',
+      isbn: book.isbn || '',
+      pages: book.pages ? String(book.pages) : '',
+      language: book.language || 'Français',
+      publisher: book.publisher || '',
+      description: book.description || '',
+      summary: book.summary || '',
+      coverImage: book.coverImage || '',
+      downloadLink: book.downloadLink || '',
+      libraryId: book.bibliotheque_id || book.libraryId || ''
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEditBook = () => {
+    setEditingBookId(null);
+    resetBookForm();
+  };
+
   const handleLibrarySubmit = async (e) => {
     e.preventDefault();
     if (!libraryForm.name || !libraryForm.address) return toast.error('Nom & adresse requis');
     try {
-      await adminService.createLibrary({ name: libraryForm.name, adresse: libraryForm.address, arrondissement: libraryForm.arrondissement || null, telephone: libraryForm.phone || null, email: libraryForm.email || null });
-      toast.success('Bibliothèque créée');
-      resetLibraryForm();
-      loadLibraries();
+      if (editingLibraryId) {
+        await adminService.updateLibrary(editingLibraryId, { name: libraryForm.name, adresse: libraryForm.address, arrondissement: libraryForm.arrondissement || null, telephone: libraryForm.phone || null, email: libraryForm.email || null });
+        toast.success('Bibliothèque mise à jour');
+        setEditingLibraryId(null);
+        resetLibraryForm();
+        loadLibraries();
+      } else {
+        await adminService.createLibrary({ name: libraryForm.name, adresse: libraryForm.address, arrondissement: libraryForm.arrondissement || null, telephone: libraryForm.phone || null, email: libraryForm.email || null });
+        toast.success('Bibliothèque créée');
+        resetLibraryForm();
+        loadLibraries();
+      }
     } catch (e) { console.error(e); toast.error('Création bibliothèque échouée'); }
   };
 
   const handleDeleteLibrary = async (id) => {
     if (!window.confirm('Supprimer cette bibliothèque ?')) return;
     try { await adminService.deleteLibrary(id); toast.info('Bibliothèque supprimée'); loadLibraries(); } catch (e) { console.error(e); toast.error('Suppression échouée'); }
+  };
+
+  const startEditLibrary = (lib) => {
+    setEditingLibraryId(lib.id);
+    setLibraryForm({
+      name: lib.name || '',
+      address: lib.adresse || lib.address || '',
+      arrondissement: lib.arrondissement || '',
+      phone: lib.telephone || '',
+      email: lib.email || '',
+      hours: lib.hours || '',
+      description: lib.description || '',
+      website: lib.website || ''
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEditLibrary = () => {
+    setEditingLibraryId(null);
+    resetLibraryForm();
   };
 
   const handleAdminSubmit = async (e) => {
@@ -319,6 +414,14 @@ const AdminDashboard = () => {
               {/* Table des livres */}
               {activeTab === 'books' && (
                 <div className="space-y-8">
+                  <div className="flex items-center justify-between">
+                    <form onSubmit={onBookSearch} className="flex items-center gap-2 mb-4">
+                      <input className="input" placeholder="Rechercher un livre..." value={bookQuery} onChange={e=>setBookQuery(e.target.value)} />
+                      <button className="btn" type="submit">Rechercher</button>
+                      <button type="button" className="btn" onClick={()=>{ setBookQuery(''); setCurrentPage(1); loadBooks(); }}>Réinitialiser</button>
+                    </form>
+                  </div>
+
                   <form onSubmit={handleBookSubmit} className="bg-gray-50 p-6 rounded-lg grid grid-cols-1 md:grid-cols-3 gap-4">
                     <input className="input" placeholder="Titre *" value={bookForm.title} onChange={e=>setBookForm({...bookForm,title:e.target.value})} />
                     <input className="input" placeholder="Auteur *" value={bookForm.author} onChange={e=>setBookForm({...bookForm,author:e.target.value})} />
@@ -337,8 +440,12 @@ const AdminDashboard = () => {
                     <textarea className="input col-span-full" rows={3} placeholder="Description" value={bookForm.description} onChange={e=>setBookForm({...bookForm,description:e.target.value})} />
                     <textarea className="input col-span-full" rows={3} placeholder="Résumé" value={bookForm.summary} onChange={e=>setBookForm({...bookForm,summary:e.target.value})} />
                     <div className="col-span-full flex gap-2">
-                      <button className="btn btn-primary" type="submit">Créer</button>
-                      <button type="button" className="btn" onClick={resetBookForm}>Reset</button>
+                      <button className="btn btn-primary" type="submit">{editingBookId ? 'Enregistrer' : 'Créer'}</button>
+                      {editingBookId ? (
+                        <button type="button" className="btn" onClick={cancelEditBook}>Annuler</button>
+                      ) : (
+                        <button type="button" className="btn" onClick={resetBookForm}>Reset</button>
+                      )}
                     </div>
                   </form>
                   <div className="overflow-x-auto">
@@ -397,7 +504,10 @@ const AdminDashboard = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             {!readOnly && (
-                              <button className="text-red-600 hover:underline text-xs" onClick={()=>handleDeleteBook(book.id)}>Supprimer</button>
+                              <div className="flex items-center gap-3">
+                                <button className="text-blue-600 hover:underline text-xs" onClick={()=>startEditBook(book)}>Modifier</button>
+                                <button className="text-red-600 hover:underline text-xs" onClick={()=>handleDeleteBook(book.id)}>Supprimer</button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -411,6 +521,14 @@ const AdminDashboard = () => {
               {/* Table des bibliothèques */}
               {activeTab === 'libraries' && (
                 <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <form onSubmit={onLibrarySearch} className="flex items-center gap-2 mb-4">
+                      <input className="input" placeholder="Rechercher une bibliothèque..." value={libraryQuery} onChange={e=>setLibraryQuery(e.target.value)} />
+                      <button className="btn" type="submit">Rechercher</button>
+                      <button type="button" className="btn" onClick={()=>{ setLibraryQuery(''); loadLibraries(); }}>Réinitialiser</button>
+                    </form>
+                  </div>
+
                   <form onSubmit={handleLibrarySubmit} className="bg-gray-50 p-4 rounded-lg grid grid-cols-1 md:grid-cols-6 gap-4">
                     <input className="input" placeholder="Nom *" value={libraryForm.name} onChange={e=>setLibraryForm({...libraryForm,name:e.target.value})} />
                     <input className="input" placeholder="Adresse *" value={libraryForm.address} onChange={e=>setLibraryForm({...libraryForm,address:e.target.value})} />
@@ -418,8 +536,12 @@ const AdminDashboard = () => {
                     <input className="input" placeholder="Email" value={libraryForm.email} onChange={e=>setLibraryForm({...libraryForm,email:e.target.value})} />
                     <input className="input" placeholder="Téléphone" value={libraryForm.phone} onChange={e=>setLibraryForm({...libraryForm,phone:e.target.value})} />
                     <div className="flex gap-2">
-                      <button className="btn btn-primary" type="submit">Ajouter</button>
-                      <button type="button" className="btn" onClick={resetLibraryForm}>Reset</button>
+                      <button className="btn btn-primary" type="submit">{editingLibraryId ? 'Enregistrer' : 'Ajouter'}</button>
+                      {editingLibraryId ? (
+                        <button type="button" className="btn" onClick={cancelEditLibrary}>Annuler</button>
+                      ) : (
+                        <button type="button" className="btn" onClick={resetLibraryForm}>Reset</button>
+                      )}
                     </div>
                   </form>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -437,7 +559,12 @@ const AdminDashboard = () => {
                           {library.telephone && <p className="text-sm text-gray-600">📞 {library.telephone}</p>}
                         </div>
                         <div className="flex space-x-2 text-xs">
-                          {!readOnly && <button className="text-red-600 hover:underline" onClick={()=>handleDeleteLibrary(library.id)}>Supprimer</button>}
+                          {!readOnly && (
+                            <div className="flex items-center gap-3">
+                              <button className="text-blue-600 hover:underline" onClick={()=>startEditLibrary(library)}>Modifier</button>
+                              <button className="text-red-600 hover:underline" onClick={()=>handleDeleteLibrary(library.id)}>Supprimer</button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}

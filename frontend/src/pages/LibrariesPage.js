@@ -8,6 +8,7 @@ import { toast } from 'react-toastify';
 const LibrariesPage = () => {
   const [libraries, setLibraries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [librariesQuery, setLibrariesQuery] = useState('');
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -26,11 +27,10 @@ const LibrariesPage = () => {
   const loadLibraries = async () => {
     try {
       setLoading(true);
-      const response = await libraryService.getAll({
-        page: currentPage,
-        limit: itemsPerPage,
-        arrondissement: selectedArrondissement || undefined
-      });
+      const params = { page: currentPage, limit: itemsPerPage };
+      if (selectedArrondissement) params.arrondissement = selectedArrondissement;
+      if (librariesQuery) params.q = librariesQuery;
+      const response = await libraryService.getAll(params);
       const { libraries: libs, totalPages: tp } = response.data;
       setLibraries(libs);
       setTotalPages(tp);
@@ -40,6 +40,12 @@ const LibrariesPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const onLibrariesSearch = (e) => {
+    e && e.preventDefault && e.preventDefault();
+    setCurrentPage(1);
+    loadLibraries();
   };
 
   const loadArrondissements = async () => {
@@ -71,6 +77,13 @@ const LibrariesPage = () => {
         <p className="text-xl text-gray-600">
           Découvrez toutes les bibliothèques parisiennes et leurs collections
         </p>
+        <div className="mt-6 max-w-lg mx-auto">
+          <form onSubmit={onLibrariesSearch} className="flex gap-2">
+            <input className="input flex-1" placeholder="Rechercher une bibliothèque (nom, adresse)..." value={librariesQuery} onChange={e=>setLibrariesQuery(e.target.value)} />
+            <button className="btn" type="submit">Rechercher</button>
+            <button type="button" className="btn" onClick={()=>{ setLibrariesQuery(''); setCurrentPage(1); loadLibraries(); }}>Réinitialiser</button>
+          </form>
+        </div>
       </div>
 
       {/* Filtres par arrondissement */}

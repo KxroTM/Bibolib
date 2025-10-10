@@ -24,7 +24,6 @@ const Footer = () => {
 				<div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
 					<div className="md:w-1/3">
 						<Link to="/" className="inline-flex items-center space-x-2">
-<<<<<<<<< Temporary merge branch 1
 							
 							<div className="flex items-center justify-center">
                 <img
@@ -33,10 +32,10 @@ const Footer = () => {
                 className="w-12s h-12 object-contain"
             />
             </div>
-=========
+
 							<div className="w-10 h-10 bg-blue-600 text-white rounded flex items-center justify-center font-bold">B</div>
 							<span className="text-lg font-semibold">Bibliothèque numérique</span>
->>>>>>>>> Temporary merge branch 2
+
 						</Link>
 						<p className="mt-3 text-sm text-gray-600">Découvrez et empruntez des livres dans votre réseau de bibliothèques. Recherche simple, réservations et prêt en un clic.</p>
 					</div>
