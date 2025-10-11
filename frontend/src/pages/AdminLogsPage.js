@@ -21,7 +21,9 @@ const AdminLogsPage = () => {
   const ACTION_OPTIONS = [
     'CREATE_ACCOUNT','USER_DELETE_ACCOUNT','USER_UPDATE','USER_ROLES_CHANGE','PASSWORD_CHANGE',
     'USER_DELETE','ADD_BOOK','UPDATE_BOOK','DELETE_BOOK','BOOK_STATUS_CHANGE','BOOK_RESERVED',
-    'BOOK_RESERVED_CANCEL','BOOK_RETURNED','ROLE_CREATE','ROLE_UPDATE','ROLE_DELETE','ROLE_ASSIGNED','ROLE_REMOVED'
+    'BOOK_RESERVED_CANCEL','BOOK_RETURNED','ROLE_CREATE','ROLE_UPDATE','ROLE_DELETE','ROLE_ASSIGNED','ROLE_REMOVED',
+    'RESERVATION_VALIDATED','RESERVATION_REJECTED','EXTENSION_REQUESTED','EXTENSION_GRANTED','EXTENSION_DENIED',
+    'CLEANUP_EXPIRED'
   ];
 
   useEffect(() => {
@@ -109,6 +111,8 @@ const AdminLogsPage = () => {
                       <option value="">Tous</option>
                       <option value="auth">auth</option>
                       <option value="books">books</option>
+                      <option value="admin">admin</option>
+                      <option value="loans">loans</option>
                     </select>
                   </div>
 

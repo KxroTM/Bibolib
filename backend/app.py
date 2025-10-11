@@ -38,7 +38,6 @@ from models import (
     get_arrondissements,
     get_genres_for_bibliotheque,
     reserve_book,
-    return_book,
     get_reservation_for_book,
     get_permissions_for_user,
     get_permission_by_name,
@@ -100,7 +99,7 @@ def home():
 def create_token(user_id):
     now = datetime.now(timezone.utc)
     payload = {
-        "sub": user_id,
+        "sub": str(user_id),  # Convertir en string pour PyJWT
         "exp": now + timedelta(minutes=app.config["JWT_EXPIRE_MIN"]),
         "iat": now
     }
@@ -110,18 +109,22 @@ def auth_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         auth_header = request.headers.get("Authorization", "")
+        
         if not auth_header.startswith("Bearer "):
             return jsonify({"message": "Token manquant"}), 401
+            
         token = auth_header.split(" ", 1)[1]
+        
         try:
             data = jwt.decode(token, app.config["JWT_SECRET"], algorithms=["HS256"])
-            user = get_user_by_id(data["sub"])
+            user_id = int(data["sub"])  # Convertir le sub string en entier
+            user = get_user_by_id(user_id)
             if not user:
                 return jsonify({"message": "Utilisateur introuvable"}), 401
             request.current_user = user
         except jwt.ExpiredSignatureError:
             return jsonify({"message": "Token expiré"}), 401
-        except Exception:
+        except Exception as e:
             return jsonify({"message": "Token invalide"}), 401
         return f(*args, **kwargs)
     return wrapper
@@ -368,6 +371,21 @@ def list_bibliotheques():
     rows = db.session.execute(text(base_sql), params).fetchall()
     total = db.session.execute(text(count_sql), params if arrondissement else {}).fetchone()[0]
     data = rows_to_dicts(rows)
+    
+    # Ajouter le nombre de livres disponibles pour chaque bibliothèque
+    for library in data:
+        book_count_sql = """
+            SELECT COUNT(*) as book_count 
+            FROM book 
+            WHERE bibliotheque_id = :library_id 
+            AND statut = 'Disponible'
+        """
+        book_count = db.session.execute(
+            text(book_count_sql), 
+            {'library_id': library['id']}
+        ).fetchone()[0]
+        library['bookCount'] = book_count
+    
     return jsonify({
         "libraries": data,
         "currentPage": page,
@@ -434,6 +452,28 @@ def list_books():
         "totalPages": (total // limit + (1 if total % limit else 0)) or 1,
         "total": total
     })
+
+@app.route("/books/recent", methods=["GET"])
+def get_recent_books():
+    """Endpoint pour récupérer les livres récents"""
+    try:
+        limit = int(request.args.get('limit', '8'))
+        from models import get_recent_books
+        books = get_recent_books(limit)
+        return jsonify(books)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/books/featured", methods=["GET"])
+def get_featured_books():
+    """Endpoint pour récupérer les livres mis en avant (aléatoire pour l'instant)"""
+    try:
+        limit = int(request.args.get('limit', '8'))
+        from models import get_random_books
+        books = get_random_books(limit)
+        return jsonify(books)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/books", methods=["POST"])
 @auth_required
@@ -648,69 +688,399 @@ def list_genres(biblio_id):
     genres = get_genres_for_bibliotheque(biblio_id)
     return jsonify([g[0] for g in genres if g and g[0]])
 
-# =============== Reservation / Borrow / Return simplistic logic ===============
 @app.route('/books/<int:book_id>/reserve', methods=['POST'])
 @auth_required
 def reserve(book_id):
+    """Crée une pré-réservation (3 jours pour récupérer)"""
     book = get_book_by_id(book_id)
     if not book:
         return jsonify({'message': 'Livre non trouvé'}), 404
-    # Check availability (API status 'available')
-    if book.get('status') != 'available':
-        return jsonify({'message': 'Livre non disponible pour réservation'}), 400
-    due_date = datetime.now(timezone.utc) + timedelta(days=3)
-    reserve_book(request.current_user['id'], book_id, due_date)
-    updated = get_book_by_id(book_id)
-    send_activity_log("/books/book-reserved", {
-        "user_id": request.current_user['id'],
-        "username": request.current_user['username'],
-        "title": book['title'],
-        "book_id": book_id,
+    
+    # Créer pré-réservation
+    success, message = reserve_book(request.current_user['id'], book_id)
+    
+    if success:
+        updated = get_book_by_id(book_id)
+        send_activity_log("/books/book-reserved", {
+            "user_id": request.current_user['id'],
+            "username": request.current_user.get('username', request.current_user.get('name', 'Utilisateur')),
+            "title": book['title'],
+            "book_id": book_id,
+            "ip": request.remote_addr or 'backend'
+        })
+        
+        return jsonify({
+            'message': message, 
+            'book': updated,
+            'pickup_deadline': None  # Sera ajouté plus tard si nécessaire
+        })
+    else:
+        return jsonify({'message': message}), 400
+
+@app.route('/books/<int:book_id>/reserve', methods=['DELETE'])
+@auth_required
+def cancel_reservation(book_id):
+    """Annule une pré-réservation"""
+    reservation = get_reservation_for_book(book_id)
+    if not reservation or reservation['user_id'] != request.current_user['id']:
+        return jsonify({'message': 'Aucune réservation active trouvée'}), 404
+    
+    from models import cancel_reservation
+    cancelled = cancel_reservation(reservation['id'])
+    
+    if cancelled:
+        send_activity_log("/books/book-reservation-cancelled", {
+            "user_id": request.current_user['id'],
+            "username": request.current_user['username'],
+            "book_id": book_id,
+            "ip": request.remote_addr or 'backend'
+        })
+        
+        updated = get_book_by_id(book_id)
+        return jsonify({'message': 'Réservation annulée', 'book': updated})
+    
+    return jsonify({'message': 'Erreur lors de l\'annulation'}), 500
+
+# =============== Endpoints Admin pour validation ===============
+@app.route('/admin/reservations/pending', methods=['GET'])
+@auth_required
+@permission_required("RESERVATION_MANAGE")
+def get_pending_pickups_endpoint():
+    """Récupère les pré-réservations en attente de validation avec recherche"""
+    from models import get_pending_pickups
+    
+    # Récupérer les paramètres de recherche
+    username_search = request.args.get('username', None)
+    book_search = request.args.get('book', None)
+    
+    # Si les paramètres sont vides, les passer comme None
+    if username_search and username_search.strip() == '':
+        username_search = None
+    if book_search and book_search.strip() == '':
+        book_search = None
+    
+    pending = get_pending_pickups(username_search, book_search)
+    return jsonify(pending)
+
+@app.route('/admin/reservations/<int:reservation_id>/validate', methods=['POST'])
+@auth_required
+@permission_required("RESERVATION_MANAGE")
+def validate_pickup_endpoint(reservation_id):
+    """Valide la récupération d'un livre en bibliothèque"""
+    from models import validate_pickup, get_reservation_by_id
+    
+    reservation = get_reservation_by_id(reservation_id)
+    if not reservation:
+        return jsonify({'message': 'Réservation non trouvée'}), 404
+    
+    if reservation['status'] != 'pre_reserved':
+        return jsonify({'message': 'Cette réservation ne peut pas être validée'}), 400
+    
+    # Valider la récupération
+    validate_pickup(reservation_id, request.current_user['id'])
+    
+    send_activity_log("/admin/reservation-validated", {
+        "admin_id": request.current_user['id'],
+        "admin_username": request.current_user['username'],
+        "user_id": reservation['user_id'],
+        "book_id": reservation['book_id'],
+        "reservation_id": reservation_id,
         "ip": request.remote_addr or 'backend'
     })
-    return jsonify({'message': 'Livre réservé', 'book': updated})
+    
+    return jsonify({'message': 'Emprunt validé. Le livre est maintenant emprunté pour 1 mois.'})
+
+@app.route('/admin/reservations/<int:reservation_id>/reject', methods=['POST'])
+@auth_required
+@permission_required("RESERVATION_MANAGE")
+def reject_pickup_endpoint(reservation_id):
+    """Rejette une pré-réservation"""
+    from models import reject_pickup, get_reservation_by_id
+    
+    reservation = get_reservation_by_id(reservation_id)
+    if not reservation:
+        return jsonify({'message': 'Réservation non trouvée'}), 404
+    
+    if reservation['status'] != 'pre_reserved':
+        return jsonify({'message': 'Cette réservation ne peut pas être rejetée'}), 400
+    
+    # Récupérer la raison du rejet (optionnelle)
+    data = request.get_json() or {}
+    reason = data.get('reason', 'Rejetée par l\'administrateur')
+    
+    # Rejeter la pré-réservation
+    reject_pickup(reservation_id, request.current_user['id'], reason)
+    
+    send_activity_log("/admin/reservation-rejected", {
+        "admin_id": request.current_user['id'],
+        "admin_username": request.current_user['username'],
+        "user_id": reservation['user_id'],
+        "book_id": reservation['book_id'],
+        "reservation_id": reservation_id,
+        "reason": reason,
+        "ip": request.remote_addr or 'backend'
+    })
+    
+    return jsonify({'message': 'Pré-réservation rejetée.'})
+
+@app.route('/admin/loans/active', methods=['GET'])
+@auth_required
+@permission_required("RESERVATION_MANAGE")
+def get_active_loans_endpoint():
+    """Récupère les emprunts actifs avec recherche"""
+    from models import get_active_loans
+    
+    # Récupérer les paramètres de recherche
+    username_search = request.args.get('username', None)
+    book_search = request.args.get('book', None)
+    
+    # Si les paramètres sont vides, les passer comme None
+    if username_search and username_search.strip() == '':
+        username_search = None
+    if book_search and book_search.strip() == '':
+        book_search = None
+    
+    active_loans = get_active_loans(username_search, book_search)
+    return jsonify(active_loans)
+
+@app.route('/admin/loans/<int:reservation_id>/return', methods=['POST'])
+@auth_required
+@permission_required("RESERVATION_MANAGE")
+def return_book_endpoint(reservation_id):
+    """Marque un livre comme rendu"""
+    from models import return_book_final, get_reservation_by_id
+    
+    reservation = get_reservation_by_id(reservation_id)
+    if not reservation:
+        return jsonify({'message': 'Emprunt non trouvé'}), 404
+    
+    if reservation['status'] != 'borrowed':
+        return jsonify({'message': 'Ce livre n\'est pas actuellement emprunté'}), 400
+    
+    # Marquer comme rendu
+    return_book_final(reservation_id)
+    
+    send_activity_log("/admin/book-returned", {
+        "admin_id": request.current_user['id'],
+        "admin_username": request.current_user['username'],
+        "user_id": reservation['user_id'],
+        "book_id": reservation['book_id'],
+        "reservation_id": reservation_id,
+        "ip": request.remote_addr or 'backend'
+    })
+    
+    return jsonify({'message': 'Livre marqué comme rendu avec succès.'})
+
+# =============== Endpoints utilisateur ===============
+@app.route('/my-loans', methods=['GET'])
+@auth_required
+def get_my_loans():
+    """Récupère les emprunts de l'utilisateur connecté"""
+    from models import get_user_reservations
+    loans = get_user_reservations(request.current_user['id'], 'borrowed')
+    return jsonify(loans)
+
+@app.route('/my-reservations', methods=['GET'])
+@auth_required 
+def get_my_reservations():
+    """Récupère toutes les réservations de l'utilisateur connecté"""
+    from models import get_user_reservations
+    reservations = get_user_reservations(request.current_user['id'])
+    return jsonify(reservations)
+
+@app.route('/loans/<int:reservation_id>/request-extension', methods=['POST'])
+@auth_required
+def request_loan_extension(reservation_id):
+    """Demande une prolongation d'emprunt"""
+    from models import get_reservation_by_id, request_extension
+    
+    reservation = get_reservation_by_id(reservation_id)
+    if not reservation or reservation['user_id'] != request.current_user['id']:
+        return jsonify({'message': 'Emprunt non trouvé'}), 404
+    
+    if reservation['status'] != 'borrowed':
+        return jsonify({'message': 'Cet emprunt ne peut pas être prolongé'}), 400
+    
+    if reservation['extension_requested']:
+        return jsonify({'message': 'Prolongation déjà demandée'}), 400
+    
+    # Vérifier qu'on est dans les 7 derniers jours
+    from datetime import datetime, timezone
+    return_due = reservation['return_due_date']
+    
+    # Si c'est déjà un objet datetime, l'utiliser directement
+    if isinstance(return_due, datetime):
+        # Assurer que c'est en UTC si pas de timezone
+        if return_due.tzinfo is None:
+            return_due = return_due.replace(tzinfo=timezone.utc)
+    else:
+        # Si c'est une chaîne, la parser
+        return_due = datetime.fromisoformat(str(return_due).replace('Z', '+00:00'))
+    
+    days_left = (return_due - datetime.now(timezone.utc)).days
+    
+    if days_left > 7:
+        return jsonify({'message': 'Vous ne pouvez demander une prolongation que dans les 7 derniers jours'}), 400
+    
+    request_extension(reservation_id)
+    
+    send_activity_log("/loans/extension-requested", {
+        "user_id": request.current_user['id'],
+        "username": request.current_user['username'], 
+        "reservation_id": reservation_id,
+        "book_id": reservation['book_id'],
+        "ip": request.remote_addr or 'backend'
+    })
+    
+    return jsonify({'message': 'Demande de prolongation envoyée'})
 
 @app.route('/books/<int:book_id>/borrow', methods=['POST'])
 @auth_required
 def borrow(book_id):
-    book = get_book_by_id(book_id)
-    if not book:
-        return jsonify({'message': 'Livre non trouvé'}), 404
-    # Allow borrow if disponible or already reserved by user
-    reservation = get_reservation_for_book(book_id)
-    if book.get('status') == 'borrowed':
-        return jsonify({'message': 'Déjà emprunté'}), 400
-    # If reserved by another user, block (status not available and reservation exists for someone else)
-    if book.get('status') != 'available' and reservation and reservation['user_id'] != request.current_user['id']:
-        return jsonify({'message': 'Réservé par un autre utilisateur'}), 403
-    # Borrow: mark directly via statut mapping
-    set_book_status(book_id, 'borrowed')
-    updated = get_book_by_id(book_id)
-    return jsonify({'message': 'Livre emprunté', 'book': updated})
+    """Endpoint conservé pour compatibilité - redirige vers reserve"""
+    return reserve(book_id)
 
 @app.route('/books/<int:book_id>/return', methods=['POST'])
 @auth_required
-def return_book_endpoint(book_id):
+@permission_required("RESERVATION_MANAGE")
+def return_book_by_book_id_endpoint(book_id):
+    """Marque un livre comme rendu (admin seulement)"""
     book = get_book_by_id(book_id)
     if not book:
         return jsonify({'message': 'Livre non trouvé'}), 404
-    if book.get('status') != 'borrowed':
-        return jsonify({'message': 'Livre non emprunté'}), 400
-    # Simplistic: find reservation row and mark returned now if exists
-    res = get_reservation_for_book(book_id)
-    if res:
-        return_book(res['id'])
-    else:
-        # Just set status available
-        set_book_status(book_id, 'available')
-    updated = get_book_by_id(book_id)
-    send_activity_log("/books/book-returned", {
-        "user_id": request.current_user['id'],
-        "username": request.current_user['username'],
-        "book_id": book_id,
+    
+    # Trouver la réservation active
+    reservation = get_reservation_for_book(book_id)
+    if not reservation or reservation['status'] != 'borrowed':
+        return jsonify({'message': 'Aucun emprunt actif trouvé'}), 400
+    
+    # Marquer comme rendu
+    from models import return_book_final
+    returned = return_book_final(reservation['id'])
+    
+    if returned:
+        send_activity_log("/books/book-returned", {
+            "admin_id": request.current_user['id'],
+            "admin_username": request.current_user['username'],
+            "user_id": reservation['user_id'],
+            "book_id": book_id,
+            "reservation_id": reservation['id'],
+            "ip": request.remote_addr or 'backend'
+        })
+        
+        updated = get_book_by_id(book_id)
+        return jsonify({'message': 'Livre rendu', 'book': updated})
+    
+    return jsonify({'message': 'Erreur lors du retour'}), 500
+
+# =============== Cron job pour nettoyage automatique ===============
+@app.route('/admin/cleanup-expired', methods=['POST'])
+@auth_required
+@permission_required("RESERVATION_MANAGE")
+def cleanup_expired_endpoint():
+    """Nettoie les pré-réservations expirées (à appeler périodiquement)"""
+    from models import cleanup_expired_prereservations
+    count = cleanup_expired_prereservations()
+    
+    send_activity_log("/admin/cleanup-expired", {
+        "admin_id": request.current_user['id'],
+        "admin_username": request.current_user['username'],
+        "expired_count": count,
         "ip": request.remote_addr or 'backend'
     })
-    return jsonify({'message': 'Livre retourné', 'book': updated})
+    
+    return jsonify({'message': f'{count} pré-réservations expirées nettoyées'})
+
+# =============== Extension management pour admin ===============
+@app.route('/admin/extensions/pending', methods=['GET'])
+@auth_required
+@permission_required("RESERVATION_MANAGE")
+def get_pending_extensions():
+    """Récupère les demandes de prolongation en attente"""
+    from models import get_user_reservations
+    # Récupérer toutes les réservations avec extension demandée
+    sql = """
+        SELECT r.*, b.titre as book_title, b.auteur as book_author, u.username 
+        FROM reservations r 
+        JOIN book b ON r.book_id = b.livre_id 
+        JOIN users u ON r.user_id = u.id
+        WHERE r.status = 'borrowed' AND r.extension_requested = TRUE
+        ORDER BY r.return_due_date ASC
+    """
+    from models import db, text, _row_to_dict
+    rows = db.session.execute(text(sql)).fetchall()
+    pending_extensions = [_row_to_dict(row) for row in rows]
+    
+    return jsonify(pending_extensions)
+
+@app.route('/admin/extensions/<int:reservation_id>/grant', methods=['POST'])
+@auth_required
+@permission_required("RESERVATION_MANAGE") 
+def grant_extension_endpoint(reservation_id):
+    """Accorde une prolongation"""
+    data = request.get_json() or {}
+    days_extension = data.get('days', 30)  # Par défaut 30 jours
+    
+    from models import get_reservation_by_id, grant_extension
+    
+    reservation = get_reservation_by_id(reservation_id)
+    if not reservation:
+        return jsonify({'message': 'Réservation non trouvée'}), 404
+    
+    if not reservation['extension_requested']:
+        return jsonify({'message': 'Aucune prolongation demandée'}), 400
+    
+    # Calculer nouvelle date
+    from datetime import datetime, timedelta, timezone
+    current_due = reservation['return_due_date']
+    
+    # Si c'est déjà un objet datetime, l'utiliser directement
+    if isinstance(current_due, datetime):
+        # Assurer que c'est en UTC si pas de timezone
+        if current_due.tzinfo is None:
+            current_due = current_due.replace(tzinfo=timezone.utc)
+    else:
+        # Si c'est une chaîne, la parser
+        current_due = datetime.fromisoformat(str(current_due).replace('Z', '+00:00'))
+    
+    new_due_date = current_due + timedelta(days=days_extension)
+    
+    grant_extension(reservation_id, request.current_user['id'], new_due_date)
+    
+    send_activity_log("/admin/extension-granted", {
+        "admin_id": request.current_user['id'],
+        "admin_username": request.current_user['username'],
+        "user_id": reservation['user_id'],
+        "reservation_id": reservation_id,
+        "days_extension": days_extension,
+        "new_due_date": new_due_date.isoformat(),
+        "ip": request.remote_addr or 'backend'
+    })
+    
+    return jsonify({'message': f'Prolongation de {days_extension} jours accordée'})
+
+@app.route('/admin/extensions/<int:reservation_id>/deny', methods=['POST'])
+@auth_required
+@permission_required("RESERVATION_MANAGE")
+def deny_extension_endpoint(reservation_id):
+    """Refuse une prolongation"""
+    from models import db, text
+    
+    # Réinitialiser la demande
+    db.session.execute(
+        text("UPDATE reservations SET extension_requested = FALSE WHERE id = :id"),
+        {"id": reservation_id}
+    )
+    db.session.commit()
+    
+    send_activity_log("/admin/extension-denied", {
+        "admin_id": request.current_user['id'],
+        "admin_username": request.current_user['username'],
+        "reservation_id": reservation_id,
+        "ip": request.remote_addr or 'backend'
+    })
+    
+    return jsonify({'message': 'Demande de prolongation refusée'})
 
 def seed_admin():
     """Idempotent admin seeding: ensures admin user, role, and permission mapping exist."""

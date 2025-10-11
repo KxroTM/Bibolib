@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { bookService, adminService, libraryService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -18,83 +18,7 @@ const BookDetailPage = () => {
   const [availableLibraries, setAvailableLibraries] = useState([]);
   const [loadingLibraries, setLoadingLibraries] = useState(false);
 
-  useEffect(() => {
-    loadBookData();
-  }, [id]);
-
-  useEffect(() => {
-    // Charger les bibliothèques disponibles quand on a les données du livre
-    if (book && book.title) {
-      loadAvailableLibraries();
-    }
-  }, [book]);
-
-  const loadAvailableLibraries = async () => {
-    try {
-      setLoadingLibraries(true);
-      
-      // Récupérer tous les livres avec le même titre
-      const response = await adminService.getBooks({
-        limit: 1000 // Récupérer beaucoup de livres pour être sûr d'avoir tous les exemplaires
-      });
-      
-      let allBooks = [];
-      const responseData = response.data;
-      
-      if (responseData && Array.isArray(responseData.books)) {
-        allBooks = responseData.books;
-      } else if (Array.isArray(responseData)) {
-        allBooks = responseData;
-      }
-      
-      // Filtrer les livres avec le même titre (normalisation)
-      const currentTitle = book.title?.toLowerCase().trim();
-      const sameBooks = allBooks.filter(b => 
-        b.title?.toLowerCase().trim() === currentTitle && 
-        b.bibliotheque_id // Avoir une bibliothèque associée
-      );
-      
-      // Récupérer les IDs uniques des bibliothèques
-      const libraryIds = [...new Set(sameBooks.map(b => b.bibliotheque_id))];
-      
-      // Récupérer les détails des bibliothèques
-      const librariesResponse = await libraryService.getAll();
-      let allLibraries = [];
-      
-      const librariesData = librariesResponse.data;
-      if (librariesData && Array.isArray(librariesData.libraries)) {
-        allLibraries = librariesData.libraries;
-      } else if (Array.isArray(librariesData)) {
-        allLibraries = librariesData;
-      }
-      
-      // Filtrer les bibliothèques qui ont ce livre avec au moins 1 exemplaire disponible
-      const availableLibs = allLibraries.filter(lib => 
-        libraryIds.includes(lib.id)
-      ).map(lib => {
-        // Ajouter des informations supplémentaires sur les exemplaires
-        const booksInThisLib = sameBooks.filter(b => b.bibliotheque_id === lib.id);
-        const availableCount = booksInThisLib.filter(b => b.status === 'available').length;
-        const totalCount = booksInThisLib.length;
-        
-        return {
-          ...lib,
-          availableCount,
-          totalCount,
-          books: booksInThisLib
-        };
-      }).filter(lib => lib.availableCount > 0); // Garder seulement les bibliothèques avec au moins 1 livre disponible
-      
-      setAvailableLibraries(availableLibs);
-      
-    } catch (error) {
-      console.error('Erreur lors du chargement des bibliothèques:', error);
-    } finally {
-      setLoadingLibraries(false);
-    }
-  };
-
-  const loadBookData = async () => {
+  const loadBookData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -149,7 +73,83 @@ const BookDetailPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  const loadAvailableLibraries = useCallback(async () => {
+    try {
+      setLoadingLibraries(true);
+      
+      // Récupérer tous les livres avec le même titre
+      const response = await adminService.getBooks({
+        limit: 1000 // Récupérer beaucoup de livres pour être sûr d'avoir tous les exemplaires
+      });
+      
+      let allBooks = [];
+      const responseData = response.data;
+      
+      if (responseData && Array.isArray(responseData.books)) {
+        allBooks = responseData.books;
+      } else if (Array.isArray(responseData)) {
+        allBooks = responseData;
+      }
+      
+      // Filtrer les livres avec le même titre (normalisation)
+      const currentTitle = book?.title?.toLowerCase().trim();
+      const sameBooks = allBooks.filter(b => 
+        b.title?.toLowerCase().trim() === currentTitle && 
+        b.bibliotheque_id // Avoir une bibliothèque associée
+      );
+      
+      // Récupérer les IDs uniques des bibliothèques
+      const libraryIds = [...new Set(sameBooks.map(b => b.bibliotheque_id))];
+      
+      // Récupérer les détails des bibliothèques
+      const librariesResponse = await libraryService.getAll();
+      let allLibraries = [];
+      
+      const librariesData = librariesResponse.data;
+      if (librariesData && Array.isArray(librariesData.libraries)) {
+        allLibraries = librariesData.libraries;
+      } else if (Array.isArray(librariesData)) {
+        allLibraries = librariesData;
+      }
+      
+      // Filtrer les bibliothèques qui ont ce livre avec au moins 1 exemplaire disponible
+      const availableLibs = allLibraries.filter(lib => 
+        libraryIds.includes(lib.id)
+      ).map(lib => {
+        // Ajouter des informations supplémentaires sur les exemplaires
+        const booksInThisLib = sameBooks.filter(b => b.bibliotheque_id === lib.id);
+        const availableCount = booksInThisLib.filter(b => b.status === 'available').length;
+        const totalCount = booksInThisLib.length;
+        
+        return {
+          ...lib,
+          availableCount,
+          totalCount,
+          books: booksInThisLib
+        };
+      }).filter(lib => lib.availableCount > 0); // Garder seulement les bibliothèques avec au moins 1 livre disponible
+      
+      setAvailableLibraries(availableLibs);
+      
+    } catch (error) {
+      console.error('Erreur lors du chargement des bibliothèques:', error);
+    } finally {
+      setLoadingLibraries(false);
+    }
+  }, [book]);
+
+  useEffect(() => {
+    loadBookData();
+  }, [loadBookData]);
+
+  useEffect(() => {
+    // Charger les bibliothèques disponibles quand on a les données du livre
+    if (book && book.title) {
+      loadAvailableLibraries();
+    }
+  }, [book, loadAvailableLibraries]);
 
   const handleImageError = () => {
     setImageError(true);
@@ -157,17 +157,22 @@ const BookDetailPage = () => {
 
   const handleReserve = async (bookId) => {
     const token = localStorage.getItem('token');
+    
     if (!user || !token) {
+      console.log('Redirection vers login - user:', !!user, 'token:', !!token);
       // redirect to login and come back here after
       navigate('/login', { state: { from: location.pathname } });
       return;
     }
 
     try {
-      const response = await bookService.reserve(bookId, user.id);
-      toast.success(response.data.message);
-      setBook(response.data.book);
+      console.log('Tentative de réservation du livre:', bookId);
+      const response = await adminService.reserveBook(bookId);
+      toast.success(response.data.message || 'Livre pré-réservé avec succès');
+      // Recharger les données du livre
+      await loadBookData();
     } catch (error) {
+      console.error('Erreur lors de la réservation:', error);
       toast.error(error.response?.data?.message || 'Erreur lors de la réservation');
     }
   };
@@ -179,28 +184,30 @@ const BookDetailPage = () => {
     }
 
     try {
-      const response = await bookService.cancelReservation(bookId, user.id);
-      toast.success(response.data.message);
-      setBook(response.data.book);
+      const response = await adminService.cancelReservation(bookId);
+      toast.success(response.data.message || 'Réservation annulée avec succès');
+      // Recharger les données du livre
+      await loadBookData();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Erreur lors de l\'annulation de la réservation');
     }
   };
 
-  const handleBorrow = async (bookId) => {
-    if (!user) {
-      navigate('/login', { state: { from: location.pathname } });
-      return;
-    }
+  const handleRequestExtension = async (reservationId) => {
+    if (!user || !reservationId) return;
 
     try {
-      const response = await bookService.borrow(bookId, user.id);
-      toast.success(response.data.message);
-      setBook(response.data.book);
+      const response = await adminService.requestExtension(reservationId);
+      toast.success(response.data.message || 'Demande de prolongation envoyée');
+      // Recharger les données du livre
+      await loadBookData();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Erreur lors de l\'emprunt');
+      toast.error(error.response?.data?.message || 'Erreur lors de la demande de prolongation');
     }
   };
+
+  // La fonction handleBorrow est supprimée car maintenant on pré-réserve seulement
+  // L'emprunt se fait via validation admin
 
   const handleReturn = async (bookId) => {
     if (!user) {
@@ -208,10 +215,17 @@ const BookDetailPage = () => {
       return;
     }
 
+    // Seuls les admins peuvent marquer les livres comme rendus
+    if (!user.permissions?.includes('RESERVATION_MANAGE')) {
+      toast.error('Seuls les administrateurs peuvent marquer les livres comme rendus');
+      return;
+    }
+
     try {
-      const response = await bookService.returnBook(bookId, user.id);
-      toast.success(response.data.message);
-      setBook(response.data.book);
+      const response = await adminService.returnBook(bookId);
+      toast.success(response.data.message || 'Livre marqué comme rendu');
+      // Recharger les données du livre
+      await loadBookData();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Erreur lors du retour');
     }
@@ -284,8 +298,8 @@ const BookDetailPage = () => {
                   book={book}
                   onReserve={handleReserve}
                   onCancelReservation={handleCancelReservation}
-                  onBorrow={handleBorrow}
                   onReturn={handleReturn}
+                  onRequestExtension={handleRequestExtension}
                 />
 
                 {book.downloadLink && (

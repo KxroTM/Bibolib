@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import text
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -381,17 +381,74 @@ def delete_book(book_id):
     db.session.commit()
 
 def get_book_by_id(book_id):
-    """Récupère un livre par son ID"""
+    """Récupère un livre par son ID avec le statut de réservation"""
+    # Récupérer les données du livre
     row = db.session.execute(
         text("SELECT * FROM book WHERE livre_id = :id"),
         {"id": book_id}
     ).fetchone()
-    return _book_row_to_api_dict(row)
+    
+    if not row:
+        return None
+    
+    book_dict = _book_row_to_api_dict(row)
+    
+    # Vérifier s'il y a une réservation active pour ce livre
+    reservation_row = db.session.execute(
+        text("""SELECT status, user_id, reserved_at, due_date, id
+                FROM reservations 
+                WHERE book_id = :book_id 
+                AND status IN ('pre_reserved', 'borrowed') 
+                ORDER BY reserved_at DESC 
+                LIMIT 1"""),
+        {"book_id": book_id}
+    ).fetchone()
+    
+    if reservation_row:
+        reservation_status = reservation_row[0]  # status
+        reserved_by_user_id = reservation_row[1]  # user_id
+        reservation_id = reservation_row[4]  # id
+        
+        if reservation_status == 'pre_reserved':
+            book_dict['status'] = 'pre_reserved'
+        elif reservation_status == 'borrowed':
+            book_dict['status'] = 'borrowed'
+            
+        # Ajouter les informations de réservation
+        book_dict['reserved_by_user_id'] = reserved_by_user_id
+        book_dict['reservation_id'] = reservation_id
+    
+    return book_dict
 
 def get_all_books():
     """Récupère tous les livres"""
     rows = db.session.execute(text("SELECT * FROM book")).fetchall()
     return [_book_row_to_api_dict(row) for row in rows]
+
+def get_recent_books(limit=8):
+    """Récupère les livres récents (basé sur l'année de publication)"""
+    rows = db.session.execute(
+        text("SELECT * FROM book WHERE annee IS NOT NULL ORDER BY annee DESC LIMIT :limit"),
+        {"limit": limit}
+    ).fetchall()
+    return [_book_row_to_api_dict(row) for row in rows]
+
+def get_random_books(limit=8):
+    """Récupère des livres aléatoirement (pour simuler les mieux notés en attendant le système de rating)"""
+    rows = db.session.execute(
+        text("SELECT * FROM book ORDER BY RAND() LIMIT :limit"),
+        {"limit": limit}
+    ).fetchall()
+    return [_book_row_to_api_dict(row) for row in rows]
+
+# TODO: Fonction future pour les livres les mieux notés
+# def get_top_rated_books(limit=8):
+#     """Récupère les livres les mieux notés (à implémenter quand le système de rating sera prêt)"""
+#     rows = db.session.execute(
+#         text("SELECT * FROM book WHERE rating IS NOT NULL ORDER BY rating DESC LIMIT :limit"),
+#         {"limit": limit}
+#     ).fetchall()
+#     return [_book_row_to_api_dict(row) for row in rows]
 
 def get_books_by_bibliotheque(biblio_id):
     """Récupère tous les livres d'une bibliothèque"""
@@ -482,44 +539,377 @@ def get_genres_for_bibliotheque(biblio_id):
 def get_reservation_for_book(book_id):
     """Récupère la réservation active d'un livre"""
     row = db.session.execute(
-        text("SELECT * FROM reservations WHERE book_id = :bid AND returned_at IS NULL ORDER BY reserved_at DESC LIMIT 1"),
+        text("SELECT * FROM reservations WHERE book_id = :bid AND status IN ('pre_reserved', 'borrowed') ORDER BY reserved_at DESC LIMIT 1"),
         {"bid": book_id}
     ).fetchone()
     return _row_to_dict(row)
 
-
-# ==========================
-# Reservations
-# ==========================
-def reserve_book(user_id, book_id, due_date):
-    """Réserve un livre"""
-    db.session.execute(
-        text("INSERT INTO reservations (user_id, book_id, reserved_at, due_date) VALUES (:user_id, :book_id, :reserved_at, :due_date)"),
-        {"user_id": user_id, "book_id": book_id, "reserved_at": datetime.utcnow(), "due_date": due_date}
-    )
-    # Met à jour le statut du livre
-    db.session.execute(
-        text("UPDATE book SET statut = 'Réservé' WHERE livre_id = :id"),
-        {"id": book_id}
-    )
-    db.session.commit()
-
-def return_book(reservation_id):
-    """Retourne un livre"""
-    db.session.execute(
-        text("UPDATE reservations SET returned_at = :returned_at WHERE id = :id"),
-        {"returned_at": datetime.utcnow(), "id": reservation_id}
-    )
-    # Met à jour le statut du livre
-    book_id = db.session.execute(
-        text("SELECT book_id FROM reservations WHERE id = :id"),
+def get_reservation_by_id(reservation_id):
+    """Récupère une réservation par son ID"""
+    row = db.session.execute(
+        text("SELECT * FROM reservations WHERE id = :id"),
         {"id": reservation_id}
-    ).fetchone()["book_id"]
+    ).fetchone()
+    return _row_to_dict(row)
+
+def get_user_reservations(user_id, status=None):
+    """Récupère toutes les réservations d'un utilisateur avec les infos de bibliothèque"""
+    if status:
+        sql = """SELECT r.*, b.titre as book_title, b.auteur as book_author, 
+                        bib.name as library_name, bib.adresse as library_address, bib.arrondissement as library_arrondissement
+                 FROM reservations r 
+                 JOIN book b ON r.book_id = b.livre_id 
+                 LEFT JOIN bibliotheques bib ON b.bibliotheque_id = bib.id
+                 WHERE r.user_id = :uid AND r.status = :status 
+                 ORDER BY r.reserved_at DESC"""
+        params = {"uid": user_id, "status": status}
+    else:
+        sql = """SELECT r.*, b.titre as book_title, b.auteur as book_author,
+                        bib.name as library_name, bib.adresse as library_address, bib.arrondissement as library_arrondissement
+                 FROM reservations r 
+                 JOIN book b ON r.book_id = b.livre_id 
+                 LEFT JOIN bibliotheques bib ON b.bibliotheque_id = bib.id
+                 WHERE r.user_id = :uid 
+                 ORDER BY r.reserved_at DESC"""
+        params = {"uid": user_id}
+    
+    rows = db.session.execute(text(sql), params).fetchall()
+    return [_row_to_dict(row) for row in rows]
+
+def get_pending_pickups(username_search=None, book_search=None):
+    """Récupère toutes les pré-réservations en attente de validation admin avec recherche optionnelle"""
+    base_sql = """
+        SELECT r.*, b.titre as book_title, b.auteur as book_author, u.username, u.email as user_email,
+               bib.name as library_name, bib.adresse as library_address
+        FROM reservations r 
+        JOIN book b ON r.book_id = b.livre_id 
+        JOIN users u ON r.user_id = u.id
+        LEFT JOIN bibliotheques bib ON b.bibliotheque_id = bib.id
+        WHERE r.status = 'pre_reserved' AND r.due_date > NOW()
+    """
+    
+    params = {}
+    
+    # Ajouter filtres de recherche
+    if username_search:
+        base_sql += " AND u.username LIKE :username_search"
+        params['username_search'] = f"%{username_search}%"
+    
+    if book_search:
+        base_sql += " AND (b.titre LIKE :book_search OR b.auteur LIKE :book_search)"
+        params['book_search'] = f"%{book_search}%"
+    
+    base_sql += " ORDER BY r.due_date ASC"
+    
+    rows = db.session.execute(text(base_sql), params).fetchall()
+    return [_row_to_dict(row) for row in rows]
+
+def get_active_loans(username_search=None, book_search=None):
+    """Récupère tous les emprunts actifs avec recherche optionnelle"""
+    base_sql = """
+        SELECT r.*, b.titre as book_title, b.auteur as book_author, u.username, u.email as user_email,
+               bib.name as library_name, bib.adresse as library_address
+        FROM reservations r 
+        JOIN book b ON r.book_id = b.livre_id 
+        JOIN users u ON r.user_id = u.id
+        LEFT JOIN bibliotheques bib ON b.bibliotheque_id = bib.id
+        WHERE r.status = 'borrowed'
+    """
+    
+    params = {}
+    
+    # Ajouter filtres de recherche
+    if username_search:
+        base_sql += " AND u.username LIKE :username_search"
+        params['username_search'] = f"%{username_search}%"
+    
+    if book_search:
+        base_sql += " AND (b.titre LIKE :book_search OR b.auteur LIKE :book_search)"
+        params['book_search'] = f"%{book_search}%"
+    
+    base_sql += " ORDER BY r.return_due_date ASC"
+    
+    rows = db.session.execute(text(base_sql), params).fetchall()
+    return [_row_to_dict(row) for row in rows]
+
+
+# ==========================
+# Reservations - Nouvelles fonctions
+# ==========================
+def reserve_book(user_id, book_id):
+    """Crée une pré-réservation"""
+    try:
+        # Vérifier que le livre existe et est disponible
+        book = db.session.execute(
+            text("SELECT * FROM book WHERE livre_id = :id"),
+            {"id": book_id}
+        ).fetchone()
+        
+        if not book:
+            return False, "Livre non trouvé"
+        
+        if book.statut != 'Disponible':
+            return False, "Livre non disponible pour réservation"
+        
+        # Vérifier que l'utilisateur n'a pas déjà une réservation pour ce livre
+        existing = db.session.execute(
+            text("SELECT * FROM reservations WHERE user_id = :user_id AND book_id = :book_id AND status IN ('pre_reserved', 'borrowed')"),
+            {"user_id": user_id, "book_id": book_id}
+        ).fetchone()
+        
+        if existing:
+            return False, "Vous avez déjà une réservation active pour ce livre"
+        
+        # Créer la pré-réservation (expire dans 3 jours)
+        due_date = datetime.utcnow() + timedelta(days=3)
+        
+        db.session.execute(
+            text("""
+                INSERT INTO reservations (user_id, book_id, reserved_at, due_date, status) 
+                VALUES (:user_id, :book_id, :reserved_at, :due_date, 'pre_reserved')
+            """),
+            {
+                "user_id": user_id, 
+                "book_id": book_id, 
+                "reserved_at": datetime.utcnow(), 
+                "due_date": due_date
+            }
+        )
+        
+        # Met à jour le statut du livre
+        db.session.execute(
+            text("UPDATE book SET statut = 'Pré-réservé' WHERE livre_id = :id"),
+            {"id": book_id}
+        )
+        
+        db.session.commit()
+        return True, "Livre pré-réservé avec succès"
+        
+    except Exception as e:
+        db.session.rollback()
+        return False, f"Erreur lors de la réservation: {str(e)}"
+
+def validate_pickup(reservation_id, admin_id):
+    """Valide la récupération d'un livre par l'admin"""
+    from datetime import timedelta
+    
+    pickup_date = datetime.utcnow()
+    return_due_date = pickup_date + timedelta(days=30)  # 1 mois
+    
+    db.session.execute(
+        text("""
+            UPDATE reservations 
+            SET status = 'borrowed', 
+                picked_up_at = :pickup_date, 
+                return_due_date = :return_due_date,
+                validated_by_admin_id = :admin_id
+            WHERE id = :reservation_id AND status = 'pre_reserved'
+        """),
+        {
+            "reservation_id": reservation_id,
+            "pickup_date": pickup_date,
+            "return_due_date": return_due_date,
+            "admin_id": admin_id
+        }
+    )
+    
+    # Récupérer le book_id pour mettre à jour le statut
+    reservation = get_reservation_by_id(reservation_id)
+    if reservation:
+        db.session.execute(
+            text("UPDATE book SET statut = 'Emprunté' WHERE livre_id = :id"),
+            {"id": reservation['book_id']}
+        )
+    
+    db.session.commit()
+    return reservation
+
+def cancel_reservation(reservation_id):
+    """Annule une réservation (par l'utilisateur)"""
+    # Récupérer les infos avant suppression
+    reservation = get_reservation_by_id(reservation_id)
+    if not reservation:
+        return None
+    
+    # Marquer comme cancelled (annulée par l'utilisateur)
+    db.session.execute(
+        text("UPDATE reservations SET status = 'cancelled', returned_at = NOW() WHERE id = :id"),
+        {"id": reservation_id}
+    )
+    
+    # Libérer le livre
     db.session.execute(
         text("UPDATE book SET statut = 'Disponible' WHERE livre_id = :id"),
-        {"id": book_id}
+        {"id": reservation['book_id']}
+    )
+    
+    db.session.commit()
+    return reservation
+
+def expire_reservation(reservation_id):
+    """Marque une réservation comme expirée (automatiquement)"""
+    # Récupérer les infos avant suppression
+    reservation = get_reservation_by_id(reservation_id)
+    if not reservation:
+        return None
+    
+    # Marquer comme expired (expirée automatiquement)
+    db.session.execute(
+        text("UPDATE reservations SET status = 'expired', returned_at = NOW() WHERE id = :id"),
+        {"id": reservation_id}
+    )
+    
+    # Libérer le livre
+    db.session.execute(
+        text("UPDATE book SET statut = 'Disponible' WHERE livre_id = :id"),
+        {"id": reservation['book_id']}
+    )
+    
+    db.session.commit()
+    return reservation
+
+def validate_pickup(reservation_id, admin_user_id):
+    """Valide une pré-réservation (passage de pre_reserved à borrowed)"""
+    try:
+        # Vérifier que la réservation existe et est en statut pre_reserved
+        reservation = get_reservation_by_id(reservation_id)
+        if not reservation or reservation['status'] != 'pre_reserved':
+            return None
+        
+        # Calculer la date de retour (1 mois après)
+        pickup_date = datetime.utcnow()
+        return_due_date = pickup_date + timedelta(days=30)
+        
+        # Mettre à jour la réservation
+        db.session.execute(
+            text("""
+                UPDATE reservations 
+                SET status = 'borrowed', 
+                    picked_up_at = :picked_up_at,
+                    return_due_date = :return_due_date,
+                    validated_by_admin_id = :admin_id
+                WHERE id = :id
+            """),
+            {
+                "id": reservation_id,
+                "picked_up_at": pickup_date,
+                "return_due_date": return_due_date,
+                "admin_id": admin_user_id
+            }
+        )
+        
+        # Mettre à jour le statut du livre
+        db.session.execute(
+            text("UPDATE book SET statut = 'Emprunté' WHERE livre_id = :book_id"),
+            {"book_id": reservation['book_id']}
+        )
+        
+        db.session.commit()
+        return get_reservation_by_id(reservation_id)
+        
+    except Exception as e:
+        db.session.rollback()
+        raise e
+
+def reject_pickup(reservation_id, admin_user_id, reason=None):
+    """Rejette une pré-réservation"""
+    try:
+        # Vérifier que la réservation existe et est en statut pre_reserved
+        reservation = get_reservation_by_id(reservation_id)
+        if not reservation or reservation['status'] != 'pre_reserved':
+            return None
+        
+        # Annuler la réservation
+        db.session.execute(
+            text("""
+                UPDATE reservations 
+                SET status = 'cancelled',
+                    cancelled_at = :cancelled_at,
+                    validated_by_admin_id = :admin_id,
+                    cancellation_reason = :reason
+                WHERE id = :id
+            """),
+            {
+                "id": reservation_id,
+                "cancelled_at": datetime.utcnow(),
+                "admin_id": admin_user_id,
+                "reason": reason or "Rejetée par l'administrateur"
+            }
+        )
+        
+        # Remettre le livre disponible
+        db.session.execute(
+            text("UPDATE book SET statut = 'Disponible' WHERE livre_id = :book_id"),
+            {"book_id": reservation['book_id']}
+        )
+        
+        db.session.commit()
+        return get_reservation_by_id(reservation_id)
+        
+    except Exception as e:
+        db.session.rollback()
+        raise e
+
+def return_book_final(reservation_id):
+    """Marque un livre comme rendu"""
+    db.session.execute(
+        text("""
+            UPDATE reservations 
+            SET status = 'returned', returned_at = :returned_at 
+            WHERE id = :id AND status = 'borrowed'
+        """),
+        {"id": reservation_id, "returned_at": datetime.utcnow()}
+    )
+    
+    # Récupérer le book_id pour libérer le livre
+    reservation = get_reservation_by_id(reservation_id)
+    if reservation:
+        db.session.execute(
+            text("UPDATE book SET statut = 'Disponible' WHERE livre_id = :id"),
+            {"id": reservation['book_id']}
+        )
+    
+    db.session.commit()
+    return reservation
+
+def request_extension(reservation_id):
+    """Demande une prolongation pour un emprunt"""
+    db.session.execute(
+        text("UPDATE reservations SET extension_requested = TRUE WHERE id = :id AND status = 'borrowed'"),
+        {"id": reservation_id}
     )
     db.session.commit()
+
+def grant_extension(reservation_id, admin_id, new_due_date):
+    """Accorde une prolongation"""
+    db.session.execute(
+        text("""
+            UPDATE reservations 
+            SET extension_granted_until = :new_due_date,
+                extension_requested = FALSE,
+                return_due_date = :new_due_date
+            WHERE id = :id AND status = 'borrowed'
+        """),
+        {"id": reservation_id, "new_due_date": new_due_date}
+    )
+    db.session.commit()
+
+def cleanup_expired_prereservations():
+    """Nettoie les pré-réservations expirées automatiquement"""
+    # Marquer comme expirées
+    expired_reservations = db.session.execute(
+        text("""
+            SELECT id, book_id FROM reservations 
+            WHERE status = 'pre_reserved' AND due_date < NOW()
+        """)
+    ).fetchall()
+    
+    count = 0
+    for reservation in expired_reservations:
+        expire_reservation(reservation['id'])
+        count += 1
+    
+    return count
 
 def set_book_status(book_id, status):
     """Met à jour le statut d'un livre (utilise le format API)"""

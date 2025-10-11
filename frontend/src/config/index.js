@@ -20,6 +20,8 @@ const API_CONFIG = {
     // Livres
   books: '/books',
   booksSearch: '/books/search',
+  booksRecent: '/books/recent',
+  booksFeatured: '/books/featured',
     
     // Admin
   // Admin (réutilise les endpoints publics pour affichage dashboard)

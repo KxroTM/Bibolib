@@ -133,43 +133,7 @@ const LoginPage = () => {
 
           {/* Bouton démo retiré */}
 
-          {/* Informations de test */}
-          <div className="mt-6 space-y-3">
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <h3 className="text-sm font-medium text-blue-800 mb-2">
-                � Compte Administrateur
-              </h3>
-              <div className="text-xs text-blue-700 space-y-1">
-                <p><strong>Email :</strong> admin@bibolib.fr</p>
-                <p><strong>Mot de passe :</strong> admin123</p>
-                <p className="mt-2 text-blue-600">
-                  Accès complet à l'interface d'administration.
-                </p>
-              </div>
-            </div>
-            
-            <div className="p-4 bg-green-50 rounded-lg">
-              <h3 className="text-sm font-medium text-green-800 mb-2">
-                📚 Comptes Utilisateurs
-              </h3>
-              <div className="text-xs text-green-700 space-y-2">
-                <div>
-                  <p><strong>Jean Martin :</strong> jean.martin@gmail.com / jean123</p>
-                  <p><strong>Sophie Leroy :</strong> sophie.leroy@yahoo.fr / sophie123</p>
-                  <p><strong>Paul Durand :</strong> paul.durand@hotmail.fr / paul123</p>
-                  <p><strong>Emma Bernard :</strong> emma.bernard@gmail.com / emma123</p>
-                </div>
-                <p className="mt-2 text-green-600">
-                  Accès aux bibliothèques et catalogues de livres.
-                </p>
-              </div>
-            </div>
-          </div>
-
           <div className="text-center space-y-3">
-            <p className="text-xs text-gray-500">
-              Connexion requise pour accéder au site
-            </p>
             <p className="text-sm">
               <span className="text-gray-600 mr-1">Pas encore de compte ?</span>
               <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500 transition-colors">

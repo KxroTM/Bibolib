@@ -10,10 +10,13 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLogsPage from './pages/AdminLogsPage';
+import AdminReservationsPage from './pages/AdminReservationsPage';
+import AdminLoansPage from './pages/AdminLoansPage';
 import BooksPage from './pages/BooksPage';
 import LibrariesPage from './pages/LibrariesPage';
 import LibraryPage from './pages/LibraryPage';
 import BookDetailPage from './pages/BookDetailPage';
+import MyLoansPage from './pages/MyLoansPage';
 import FaqPage from './pages/FaqPage';
 import ContactPage from './pages/ContactPage';
 import ConditionsPage from './pages/ConditionsPage';
@@ -92,12 +95,24 @@ function AppContent() {
           <Route path="/book/:id" element={<Navigate to="/livre/:id" replace />} />
           <Route path="/library/:id" element={<Navigate to="/bibliotheque/:id" replace />} />
           <Route
+            path="/mes-emprunts"
+            element={<ProtectedRoute><MyLoansPage /></ProtectedRoute>}
+          />
+          <Route
             path="/admin"
             element={<ProtectedRoute permission="ADMIN_DASHBOARD"><AdminDashboard /></ProtectedRoute>}
           />
           <Route
             path="/admin/logs"
             element={<ProtectedRoute permission="ADMIN_DASHBOARD"><AdminLogsPage /></ProtectedRoute>}
+          />
+          <Route
+            path="/admin/reservations"
+            element={<ProtectedRoute permission="RESERVATION_MANAGE"><AdminReservationsPage /></ProtectedRoute>}
+          />
+          <Route
+            path="/admin/loans"
+            element={<ProtectedRoute permission="RESERVATION_MANAGE"><AdminLoansPage /></ProtectedRoute>}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

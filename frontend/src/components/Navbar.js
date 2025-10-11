@@ -40,6 +40,12 @@ const Navbar = () => {
                 <span className="text-sm font-medium">🏛️</span>
                 <span className="text-sm">Bibliothèques</span>
               </Link>
+              {user && (
+                <Link to="/mes-emprunts" className="px-3 py-1 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors flex items-center space-x-2">
+                  <span className="text-sm font-medium">📚</span>
+                  <span className="text-sm">Mes emprunts</span>
+                </Link>
+              )}
             </div>
           </div>
 
@@ -55,12 +61,30 @@ const Navbar = () => {
                   {isAdmin() && <span className="ml-2 px-2 py-1 text-xs bg-primary-100 text-primary-800 rounded-full">Admin</span>}
                 </span>
                 {isAdmin() && (
-                  <Link
-                    to="/admin"
-                    className="px-3 py-1 rounded-full bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors"
-                  >
-                    Dashboard
-                  </Link>
+                  <>
+                    <Link
+                      to="/admin"
+                      className="px-3 py-1 rounded-full bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors"
+                    >
+                      Dashboard
+                    </Link>
+                    {user.permissions?.includes('RESERVATION_MANAGE') && (
+                      <>
+                        <Link
+                          to="/admin/reservations"
+                          className="px-3 py-1 rounded-full bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
+                        >
+                          📋 Réservations
+                        </Link>
+                        <Link
+                          to="/admin/loans"
+                          className="px-3 py-1 rounded-full bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+                        >
+                          📚 Emprunts
+                        </Link>
+                      </>
+                    )}
+                  </>
                 )}
                 <button
                   onClick={handleLogout}

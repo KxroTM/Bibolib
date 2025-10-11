@@ -13,21 +13,8 @@ const api = axios.create({
   }
 });
 
-
-// DEMO_MODE retiré
-
-// Fonction helper pour simuler une réponse API
-const mockApiResponse = (data, delay = 500) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({ data });
-    }, delay);
-  });
-};
-
 // Intercepteur pour les requêtes (ajouter le token d'auth)
-{
-  api.interceptors.request.use(
+api.interceptors.request.use(
     (config) => {
       const token = localStorage.getItem('token');
       if (token) {
@@ -60,7 +47,6 @@ const mockApiResponse = (data, delay = 500) => {
       return Promise.reject(error);
     }
   );
-}
 
 // Service d'authentification
 export const authService = {
@@ -190,6 +176,18 @@ export const bookService = {
   returnBook: (id, userId) => {
     return api.post(`${API_CONFIG.endpoints.books}/${id}/return`);
   },
+
+  getRecentBooks: (limit = 8) => {
+    return api.get(API_CONFIG.endpoints.booksRecent, { params: { limit } })
+      .then(res => ({ data: Array.isArray(res.data) ? res.data : [] }))
+      .catch(() => ({ data: [] }));
+  },
+
+  getFeaturedBooks: (limit = 8) => {
+    return api.get(API_CONFIG.endpoints.booksFeatured, { params: { limit } })
+      .then(res => ({ data: Array.isArray(res.data) ? res.data : [] }))
+      .catch(() => ({ data: [] }));
+  },
 };
 
 // Service d'administration (CRUD réactivé)
@@ -239,9 +237,38 @@ export const adminService = {
   updateUser: (id, payload) => api.put(`/users/${id}`, payload),
   deleteUser: (id) => api.delete(`/users/${id}`),
 
-  // Réservations placeholder
-  getReservations: () => Promise.resolve({ data: [] })
-  ,
+  // Réservations et emprunts - nouveau système
+  getReservations: () => Promise.resolve({ data: [] }),
+  
+  // Nouvelles fonctions pour le système de réservation
+  reserveBook: (bookId) => api.post(`/books/${bookId}/reserve`),
+  cancelReservation: (bookId) => api.delete(`/books/${bookId}/reserve`),
+  
+  // Endpoints utilisateur
+  getMyLoans: () => api.get('/my-loans'),
+  getMyReservations: () => api.get('/my-reservations'),
+  requestExtension: (reservationId) => api.post(`/loans/${reservationId}/request-extension`),
+  
+  // Endpoints admin pour validation
+  getPendingReservations: (params = {}) => api.get('/admin/reservations/pending', { params }),
+  validatePickup: (reservationId) => api.post(`/admin/reservations/${reservationId}/validate`),
+  rejectReservation: (reservationId, reason = '') => api.post(`/admin/reservations/${reservationId}/reject`, { reason }),
+  
+  // Endpoints admin pour prolongations
+  getPendingExtensions: () => api.get('/admin/extensions/pending'),
+  grantExtension: (reservationId, days = 30) => api.post(`/admin/extensions/${reservationId}/grant`, { days }),
+  denyExtension: (reservationId) => api.post(`/admin/extensions/${reservationId}/deny`),
+  
+  // Nettoyage automatique
+  cleanupExpired: () => api.post('/admin/cleanup-expired'),
+  
+  // Endpoints admin pour gestion des emprunts
+  getActiveLoans: (params = {}) => api.get('/admin/loans/active', { params }),
+  returnLoan: (reservationId) => api.post(`/admin/loans/${reservationId}/return`),
+  
+  // Endpoint de retour de livre (admin) - legacy
+  returnBook: (bookId) => api.post(`/books/${bookId}/return`),
+  
   // Logs (service externe activity_logs, par défaut sur :8080)
   getLogs: (params = {}) => {
     // Appelle l'API d'activity_logs directement (override baseURL)
