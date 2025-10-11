@@ -98,7 +98,7 @@ const LibraryPage = () => {
       setGenres(genresResponse.data);
       
     } catch (error) {
-      console.error('Erreur lors du chargement des données:', error);
+      
       toast.error('Erreur lors du chargement de la bibliothèque');
       
       // Données de démonstration
@@ -183,7 +183,7 @@ const LibraryPage = () => {
       
       setFilteredBooks(searchResults);
     } catch (error) {
-      console.error('Erreur lors de la recherche:', error);
+      
       // Recherche locale en cas d'erreur
       const filtered = books.filter(book =>
         book.title.toLowerCase().includes(query.toLowerCase()) ||

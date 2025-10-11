@@ -34,11 +34,6 @@ const BookCarousel = ({ books, title, subtitle, speed = 40 }) => {
         inner.style.transform = `translateX(${-offsetRef.current}px)`;
       }
 
-      if (process.env.NODE_ENV === 'development') {
-        // eslint-disable-next-line no-console
-        console.debug('[BookCarousel] offset', offsetRef.current, 'singleSetWidth', singleSetWidth, 'hover', isHoveredRef.current);
-      }
-
       rafRef.current = requestAnimationFrame(step);
     };
 
@@ -109,12 +104,10 @@ const BookCarousel = ({ books, title, subtitle, speed = 40 }) => {
           onMouseEnter={() => {
             setIsHovered(true);
             isHoveredRef.current = true;
-            if (process.env.NODE_ENV === 'development') console.debug('[BookCarousel] hover enter');
           }}
           onMouseLeave={() => {
             setIsHovered(false);
             isHoveredRef.current = false;
-            if (process.env.NODE_ENV === 'development') console.debug('[BookCarousel] hover leave');
           }}
         >
           <div ref={innerRef} className="flex space-x-6 will-change-transform">

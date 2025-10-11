@@ -12,6 +12,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminLogsPage from './pages/AdminLogsPage';
 import AdminReservationsPage from './pages/AdminReservationsPage';
 import AdminLoansPage from './pages/AdminLoansPage';
+import RolesPermissionsPage from './pages/RolesPermissionsPage';
 import BooksPage from './pages/BooksPage';
 import LibrariesPage from './pages/LibrariesPage';
 import LibraryPage from './pages/LibraryPage';
@@ -113,6 +114,11 @@ function AppContent() {
           <Route
             path="/admin/loans"
             element={<ProtectedRoute permission="RESERVATION_MANAGE"><AdminLoansPage /></ProtectedRoute>}
+          />
+          {/* Route système pour la maintenance */}
+          <Route
+            path="/system/maintenance"
+            element={<ProtectedRoute permission="ADMIN_DASHBOARD"><RolesPermissionsPage /></ProtectedRoute>}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

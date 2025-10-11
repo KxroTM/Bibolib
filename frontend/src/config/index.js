@@ -25,9 +25,9 @@ const API_CONFIG = {
     
     // Admin
   // Admin (réutilise les endpoints publics pour affichage dashboard)
-  adminBooks: '/books',
+  adminBooks: '/admin/books',
   adminLibraries: '/admin/bibliotheques',
-  adminUsers: '/users',
+  adminUsers: '/admin/users',
   adminReservations: '/reservations' // (non implémenté côté back pour l'instant)
   }
 };

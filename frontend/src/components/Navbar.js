@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, hasPermission } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -59,32 +59,34 @@ const Navbar = () => {
                     return base ? `Bonjour, ${base}` : 'Bonjour';
                   })()}
                   {isAdmin() && <span className="ml-2 px-2 py-1 text-xs bg-primary-100 text-primary-800 rounded-full">Admin</span>}
+                  {!isAdmin() && (hasPermission('RESERVATION_MANAGE') || hasPermission('LIBRARY_MANAGE')) && (
+                    <span className="ml-2 px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Bibliothécaire</span>
+                  )}
                 </span>
                 {isAdmin() && (
-                  <>
-                    <Link
-                      to="/admin"
-                      className="px-3 py-1 rounded-full bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors"
-                    >
-                      Dashboard
-                    </Link>
-                    {user.permissions?.includes('RESERVATION_MANAGE') && (
-                      <>
-                        <Link
-                          to="/admin/reservations"
-                          className="px-3 py-1 rounded-full bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
-                        >
-                          📋 Réservations
-                        </Link>
-                        <Link
-                          to="/admin/loans"
-                          className="px-3 py-1 rounded-full bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
-                        >
-                          📚 Emprunts
-                        </Link>
-                      </>
-                    )}
-                  </>
+                  <Link
+                    to="/admin"
+                    className="px-3 py-1 rounded-full bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors"
+                  >
+                    Dashboard
+                  </Link>
+                )}
+                {/* Boutons pour les permissions spécifiques (employés de bibliothèque ou admins) */}
+                {hasPermission('RESERVATION_MANAGE') && (
+                  <Link
+                    to="/admin/reservations"
+                    className="px-3 py-1 rounded-full bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
+                  >
+                    📋 Réservations
+                  </Link>
+                )}
+                {hasPermission('RESERVATION_MANAGE') && (
+                  <Link
+                    to="/admin/loans"
+                    className="px-3 py-1 rounded-full bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    📚 Emprunts
+                  </Link>
                 )}
                 <button
                   onClick={handleLogout}

@@ -242,6 +242,79 @@ def list_users():
         enriched.append(u)
     return jsonify(enriched)
 
+@app.route('/admin/users', methods=['GET'])
+def admin_list_users():
+    """Endpoint admin pour lister les utilisateurs avec support de recherche"""
+    try:
+        page = int(request.args.get('page', '1'))
+        limit = int(request.args.get('limit', '50'))
+    except ValueError:
+        page, limit = 1, 50
+    if limit <= 0:
+        limit = 50
+    if page <= 0:
+        page = 1
+    offset = (page - 1) * limit
+    
+    q = request.args.get('q', '').strip()  # Recherche par nom ou email
+    role_filter = request.args.get('role', '').strip()  # Filtrage par rôle
+
+    base_sql = "SELECT id, username, email, created_at FROM users"
+    count_sql = "SELECT COUNT(*) as c FROM users"
+    params = {}
+    conditions = []
+    
+    if q:
+        conditions.append("(username LIKE :search OR email LIKE :search)")
+        params['search'] = f'%{q}%'
+    
+    # Filtrage par rôle - nécessite une jointure avec role_user et roles
+    if role_filter:
+        base_sql = """
+            SELECT DISTINCT u.id, u.username, u.email, u.created_at 
+            FROM users u 
+            INNER JOIN role_user ru ON u.id = ru.user_id 
+            INNER JOIN roles r ON ru.role_id = r.id
+        """
+        count_sql = """
+            SELECT COUNT(DISTINCT u.id) as c 
+            FROM users u 
+            INNER JOIN role_user ru ON u.id = ru.user_id 
+            INNER JOIN roles r ON ru.role_id = r.id
+        """
+        conditions.append("r.name = :role")
+        params['role'] = role_filter
+    
+    if conditions:
+        where_clause = " WHERE " + " AND ".join(conditions)
+        base_sql += where_clause
+        count_sql += where_clause
+    
+    base_sql += " ORDER BY id LIMIT :limit OFFSET :offset"
+    params['limit'] = limit
+    params['offset'] = offset
+
+    rows = db.session.execute(text(base_sql), params).fetchall()
+    users_raw = rows_to_dicts(rows)
+
+    # Enrichir avec les rôles
+    users = []
+    for u in users_raw:
+        uid = u.get('id')
+        u['roles'] = get_roles_for_user(uid) if uid else []
+        users.append(u)
+
+    total = db.session.execute(text(count_sql), {k: v for k, v in params.items() if k not in ['limit', 'offset']}).fetchone()[0]
+    
+    total_pages = (total + limit - 1) // limit
+
+    return jsonify({
+        'users': users,
+        'total': total,
+        'totalPages': total_pages,
+        'currentPage': page
+    })
+
 @app.route('/users/<int:user_id>', methods=['PUT'])
 @auth_required
 @permission_required('USER_MANAGE')
@@ -355,21 +428,33 @@ def list_bibliotheques():
     if page <= 0:
         page = 1
     offset = (page - 1) * limit
+    
+    q = request.args.get('q', '').strip()  # Recherche par nom
     arrondissement = request.args.get('arrondissement', '').strip()
 
     base_sql = "SELECT * FROM bibliotheques"
     count_sql = "SELECT COUNT(*) as c FROM bibliotheques"
     params = {}
+    conditions = []
+    
+    if q:
+        conditions.append("(name LIKE :search OR adresse LIKE :search)")
+        params['search'] = f'%{q}%'
+    
     if arrondissement:
-        base_sql += " WHERE arrondissement = :arr"
-        count_sql += " WHERE arrondissement = :arr"
+        conditions.append("arrondissement = :arr")
         params['arr'] = arrondissement
+    
+    if conditions:
+        where_clause = " WHERE " + " AND ".join(conditions)
+        base_sql += where_clause
+        count_sql += where_clause
     base_sql += " ORDER BY id LIMIT :limit OFFSET :offset"
     params['limit'] = limit
     params['offset'] = offset
 
     rows = db.session.execute(text(base_sql), params).fetchall()
-    total = db.session.execute(text(count_sql), params if arrondissement else {}).fetchone()[0]
+    total = db.session.execute(text(count_sql), {k: v for k, v in params.items() if k not in ['limit', 'offset']}).fetchone()[0]
     data = rows_to_dicts(rows)
     
     # Ajouter le nombre de livres disponibles pour chaque bibliothèque
@@ -395,8 +480,126 @@ def list_bibliotheques():
 
 # Alias admin (même data, chemin différent demandé côté dashboard)
 @app.route('/admin/bibliotheques', methods=['GET'])
-def admin_alias_bibliotheques():
-    return list_bibliotheques()
+def admin_list_bibliotheques():
+    """Endpoint admin pour lister les bibliothèques avec support de recherche"""
+    try:
+        page = int(request.args.get('page', '1'))
+        limit = int(request.args.get('limit', '50'))
+    except ValueError:
+        page, limit = 1, 50
+    if limit <= 0:
+        limit = 50
+    if page <= 0:
+        page = 1
+    offset = (page - 1) * limit
+    
+    q = request.args.get('q', '').strip()  # Recherche par nom
+    arrondissement = request.args.get('arrondissement', '').strip()
+
+    base_sql = "SELECT * FROM bibliotheques"
+    count_sql = "SELECT COUNT(*) as c FROM bibliotheques"
+    params = {}
+    conditions = []
+    
+    if q:
+        conditions.append("name LIKE :search")
+        params['search'] = f'%{q}%'
+    
+    if arrondissement:
+        conditions.append("arrondissement = :arr")
+        params['arr'] = arrondissement
+    
+    if conditions:
+        where_clause = " WHERE " + " AND ".join(conditions)
+        base_sql += where_clause
+        count_sql += where_clause
+    
+    base_sql += " ORDER BY id LIMIT :limit OFFSET :offset"
+    params['limit'] = limit
+    params['offset'] = offset
+
+    rows = db.session.execute(text(base_sql), params).fetchall()
+    libraries = rows_to_dicts(rows)
+
+    total = db.session.execute(text(count_sql), {k: v for k, v in params.items() if k not in ['limit', 'offset']}).fetchone()[0]
+    
+    total_pages = (total + limit - 1) // limit
+
+    return jsonify({
+        'libraries': libraries,
+        'total': total,
+        'totalPages': total_pages,
+        'currentPage': page
+    })
+
+@app.route('/admin/books', methods=['GET'])
+@auth_required
+def admin_list_books():
+    """Endpoint admin pour lister les livres avec informations enrichies (nom bibliothèque)"""
+    try:
+        page = int(request.args.get('page', '1'))
+        limit = int(request.args.get('limit', '50'))
+    except ValueError:
+        page, limit = 1, 50
+    if limit <= 0:
+        limit = 50
+    if page <= 0:
+        page = 1
+    offset = (page - 1) * limit
+    genre = request.args.get('genre', '').strip()
+    availability = request.args.get('availability', '').strip()
+    q = request.args.get('q', '').strip()  # Recherche par titre/auteur
+
+    # Requête avec JOIN pour récupérer le nom de la bibliothèque
+    base_sql = """
+    SELECT b.*, bib.name as bibliotheque_nom 
+    FROM book b 
+    LEFT JOIN bibliotheques bib ON b.bibliotheque_id = bib.id
+    """
+    count_sql = "SELECT COUNT(*) as c FROM book b"
+    params = {}
+    where_clauses = []
+    
+    if genre:
+        where_clauses.append("b.categorie = :genre")
+        params['genre'] = genre
+    if availability:
+        from models import _api_status_to_db_statut
+        statut_db = _api_status_to_db_statut(availability)
+        where_clauses.append("b.statut = :statut")
+        params['statut'] = statut_db
+    if q:
+        where_clauses.append("(b.titre LIKE :q OR b.auteur LIKE :q)")
+        params['q'] = f'%{q}%'
+    
+    if where_clauses:
+        where_sql = " WHERE " + " AND ".join(where_clauses)
+        base_sql += where_sql
+        count_sql += where_sql.replace("b.", "")  # Pour le count, pas de alias nécessaire
+        
+    base_sql += " ORDER BY b.titre LIMIT :limit OFFSET :offset"
+    params['limit'] = limit
+    params['offset'] = offset
+
+    rows = db.session.execute(text(base_sql), params).fetchall()
+    total = db.session.execute(text(count_sql), params).fetchone()[0]
+    
+    # Convertir les lignes vers format API enrichi
+    books_data = []
+    for row in rows:
+        from models import _book_row_to_api_dict
+        book_dict = _book_row_to_api_dict(row)
+        if book_dict:
+            # Ajouter le nom de la bibliothèque
+            book_dict['bibliotheque_nom'] = row.bibliotheque_nom if hasattr(row, 'bibliotheque_nom') else None
+            books_data.append(book_dict)
+    
+    return jsonify({
+        "books": books_data,
+        "currentPage": page,
+        "totalPages": (total // limit + (1 if total % limit else 0)) or 1,
+        "total": total
+    })
 
 
 @app.route("/books", methods=["GET"])
@@ -1082,6 +1285,296 @@ def deny_extension_endpoint(reservation_id):
     
     return jsonify({'message': 'Demande de prolongation refusée'})
 
+# ==========================
+# ROLES & PERMISSIONS MANAGEMENT (Page secrète)
+# ==========================
+
+@app.route('/admin/roles', methods=['GET'])
+@auth_required
+def get_all_roles():
+    """Récupérer tous les rôles"""
+    try:
+        from models import db, text
+        rows = db.session.execute(text("SELECT * FROM roles ORDER BY name")).fetchall()
+        roles = []
+        for row in rows:
+            role_dict = {
+                "id": row.id,
+                "name": row.name,
+                "description": row.description,
+                "permissions": get_permissions_for_role(row.id)
+            }
+            roles.append(role_dict)
+        return jsonify({"roles": roles})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin/roles', methods=['POST'])
+@auth_required
+def create_role_endpoint():
+    """Créer un nouveau rôle"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        description = data.get('description', '').strip()
+        
+        if not name:
+            return jsonify({"error": "Le nom du rôle est requis"}), 400
+            
+        # Vérifier si le rôle existe déjà
+        existing = get_role_by_name(name)
+        if existing:
+            return jsonify({"error": "Un rôle avec ce nom existe déjà"}), 400
+            
+        create_role(name, description)
+        
+        send_activity_log("/admin/role-created", {
+            "admin_id": request.current_user['id'],
+            "admin_username": request.current_user['username'],
+            "role_name": name,
+            "ip": request.remote_addr or 'backend'
+        })
+        
+        return jsonify({"message": "Rôle créé avec succès"}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin/roles/<int:role_id>', methods=['PUT'])
+@auth_required
+def update_role_endpoint(role_id):
+    """Modifier un rôle"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        description = data.get('description', '').strip()
+        
+        if not name:
+            return jsonify({"error": "Le nom du rôle est requis"}), 400
+            
+        from models import db, text
+        db.session.execute(
+            text("UPDATE roles SET name = :name, description = :description WHERE id = :id"),
+            {"name": name, "description": description, "id": role_id}
+        )
+        db.session.commit()
+        
+        send_activity_log("/admin/role-updated", {
+            "admin_id": request.current_user['id'],
+            "admin_username": request.current_user['username'],
+            "role_id": role_id,
+            "role_name": name,
+            "ip": request.remote_addr or 'backend'
+        })
+        
+        return jsonify({"message": "Rôle modifié avec succès"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin/roles/<int:role_id>', methods=['DELETE'])
+@auth_required
+def delete_role_endpoint(role_id):
+    """Supprimer un rôle"""
+    try:
+        from models import db, text
+        
+        # Vérifier que ce n'est pas le rôle admin
+        role = db.session.execute(text("SELECT name FROM roles WHERE id = :id"), {"id": role_id}).fetchone()
+        if role and role.name == 'admin':
+            return jsonify({"error": "Impossible de supprimer le rôle admin"}), 400
+            
+        # Supprimer les associations
+        db.session.execute(text("DELETE FROM role_user WHERE role_id = :id"), {"id": role_id})
+        db.session.execute(text("DELETE FROM permission_role WHERE role_id = :id"), {"id": role_id})
+        # Supprimer le rôle
+        db.session.execute(text("DELETE FROM roles WHERE id = :id"), {"id": role_id})
+        db.session.commit()
+        
+        send_activity_log("/admin/role-deleted", {
+            "admin_id": request.current_user['id'],
+            "admin_username": request.current_user['username'],
+            "role_id": role_id,
+            "ip": request.remote_addr or 'backend'
+        })
+        
+        return jsonify({"message": "Rôle supprimé avec succès"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin/permissions', methods=['GET'])
+@auth_required
+def get_all_permissions():
+    """Récupérer toutes les permissions"""
+    try:
+        from models import db, text
+        rows = db.session.execute(text("SELECT * FROM permissions ORDER BY name")).fetchall()
+        permissions = [{"id": row.id, "name": row.name, "description": row.description} for row in rows]
+        return jsonify({"permissions": permissions})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin/permissions', methods=['POST'])
+@auth_required
+def create_permission_endpoint():
+    """Créer une nouvelle permission"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        description = data.get('description', '').strip()
+        
+        if not name:
+            return jsonify({"error": "Le nom de la permission est requis"}), 400
+            
+        # Vérifier si la permission existe déjà
+        existing = get_permission_by_name(name)
+        if existing:
+            return jsonify({"error": "Une permission avec ce nom existe déjà"}), 400
+            
+        create_permission(name, description)
+        
+        send_activity_log("/admin/permission-created", {
+            "admin_id": request.current_user['id'],
+            "admin_username": request.current_user['username'],
+            "permission_name": name,
+            "ip": request.remote_addr or 'backend'
+        })
+        
+        return jsonify({"message": "Permission créée avec succès"}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin/roles/<int:role_id>/permissions', methods=['POST'])
+@auth_required
+def assign_permission_to_role_endpoint(role_id):
+    """Attribuer une permission à un rôle"""
+    try:
+        data = request.get_json()
+        permission_id = data.get('permission_id')
+        
+        if not permission_id:
+            return jsonify({"error": "ID de permission requis"}), 400
+            
+        # Vérifier si l'association existe déjà
+        from models import db, text
+        existing = db.session.execute(
+            text("SELECT 1 FROM permission_role WHERE role_id = :rid AND permission_id = :pid"),
+            {"rid": role_id, "pid": permission_id}
+        ).fetchone()
+        
+        if existing:
+            return jsonify({"error": "Cette permission est déjà attribuée à ce rôle"}), 400
+            
+        assign_permission_to_role(role_id, permission_id)
+        
+        send_activity_log("/admin/permission-assigned", {
+            "admin_id": request.current_user['id'],
+            "admin_username": request.current_user['username'],
+            "role_id": role_id,
+            "permission_id": permission_id,
+            "ip": request.remote_addr or 'backend'
+        })
+        
+        return jsonify({"message": "Permission attribuée avec succès"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin/roles/<int:role_id>/permissions/<int:permission_id>', methods=['DELETE'])
+@auth_required
+def remove_permission_from_role_endpoint(role_id, permission_id):
+    """Retirer une permission d'un rôle"""
+    try:
+        from models import db, text
+        db.session.execute(
+            text("DELETE FROM permission_role WHERE role_id = :rid AND permission_id = :pid"),
+            {"rid": role_id, "pid": permission_id}
+        )
+        db.session.commit()
+        
+        send_activity_log("/admin/permission-removed", {
+            "admin_id": request.current_user['id'],
+            "admin_username": request.current_user['username'],
+            "role_id": role_id,
+            "permission_id": permission_id,
+            "ip": request.remote_addr or 'backend'
+        })
+        
+        return jsonify({"message": "Permission retirée avec succès"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin/users/<int:user_id>/roles', methods=['POST'])
+@auth_required
+def assign_role_to_user_endpoint(user_id):
+    """Attribuer un rôle à un utilisateur"""
+    try:
+        data = request.get_json()
+        role_id = data.get('role_id')
+        
+        if not role_id:
+            return jsonify({"error": "ID de rôle requis"}), 400
+            
+        # Vérifier si l'association existe déjà
+        from models import db, text
+        existing = db.session.execute(
+            text("SELECT 1 FROM role_user WHERE user_id = :uid AND role_id = :rid"),
+            {"uid": user_id, "rid": role_id}
+        ).fetchone()
+        
+        if existing:
+            return jsonify({"error": "Ce rôle est déjà attribué à cet utilisateur"}), 400
+            
+        assign_role_to_user(user_id, role_id)
+        
+        send_activity_log("/admin/role-assigned-to-user", {
+            "admin_id": request.current_user['id'],
+            "admin_username": request.current_user['username'],
+            "user_id": user_id,
+            "role_id": role_id,
+            "ip": request.remote_addr or 'backend'
+        })
+        
+        return jsonify({"message": "Rôle attribué avec succès"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin/users/<int:user_id>/roles/<int:role_id>', methods=['DELETE'])
+@auth_required
+def remove_role_from_user_endpoint(user_id, role_id):
+    """Retirer un rôle d'un utilisateur"""
+    try:
+        from models import db, text
+        
+        # Vérifier que ce n'est pas le dernier admin
+        role = db.session.execute(text("SELECT name FROM roles WHERE id = :id"), {"id": role_id}).fetchone()
+        if role and role.name == 'admin':
+            admin_count = db.session.execute(
+                text("SELECT COUNT(*) as c FROM role_user ru JOIN roles r ON ru.role_id = r.id WHERE r.name = 'admin'")
+            ).fetchone().c
+            if admin_count <= 1:
+                return jsonify({"error": "Impossible de retirer le dernier administrateur"}), 400
+        
+        db.session.execute(
+            text("DELETE FROM role_user WHERE user_id = :uid AND role_id = :rid"),
+            {"uid": user_id, "rid": role_id}
+        )
+        db.session.commit()
+        
+        send_activity_log("/admin/role-removed-from-user", {
+            "admin_id": request.current_user['id'],
+            "admin_username": request.current_user['username'],
+            "user_id": user_id,
+            "role_id": role_id,
+            "ip": request.remote_addr or 'backend'
+        })
+        
+        return jsonify({"message": "Rôle retiré avec succès"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==================
+# Seeding
+# ==================
+
 def seed_admin():
     """Idempotent admin seeding: ensures admin user, role, and permission mapping exist."""
     admin_email = os.getenv("ADMIN_EMAIL", "admin@bibolib.local")
@@ -1130,4 +1623,4 @@ if __name__ == "__main__":
     with app.app_context():
         create_all_tables()
         seed_admin()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000)

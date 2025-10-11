@@ -29,7 +29,7 @@ const BookDetailPage = () => {
       setLibrary(response.data?.library || null);
       
     } catch (error) {
-      console.error('Erreur lors du chargement du livre:', error);
+      
       const serverMsg = error?.response?.data?.message;
       const status = error?.response?.status;
       toast.error(`Erreur lors du chargement du livre${status ? ' ('+status+')' : ''}${serverMsg ? ': '+serverMsg : ''}`);
@@ -80,7 +80,7 @@ const BookDetailPage = () => {
       setLoadingLibraries(true);
       
       // Récupérer tous les livres avec le même titre
-      const response = await adminService.getBooks({
+      const response = await bookService.getAll({
         limit: 1000 // Récupérer beaucoup de livres pour être sûr d'avoir tous les exemplaires
       });
       
@@ -134,7 +134,7 @@ const BookDetailPage = () => {
       setAvailableLibraries(availableLibs);
       
     } catch (error) {
-      console.error('Erreur lors du chargement des bibliothèques:', error);
+      
     } finally {
       setLoadingLibraries(false);
     }
@@ -159,20 +159,20 @@ const BookDetailPage = () => {
     const token = localStorage.getItem('token');
     
     if (!user || !token) {
-      console.log('Redirection vers login - user:', !!user, 'token:', !!token);
+      
       // redirect to login and come back here after
       navigate('/login', { state: { from: location.pathname } });
       return;
     }
 
     try {
-      console.log('Tentative de réservation du livre:', bookId);
+      
       const response = await adminService.reserveBook(bookId);
       toast.success(response.data.message || 'Livre pré-réservé avec succès');
       // Recharger les données du livre
       await loadBookData();
     } catch (error) {
-      console.error('Erreur lors de la réservation:', error);
+      
       toast.error(error.response?.data?.message || 'Erreur lors de la réservation');
     }
   };

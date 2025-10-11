@@ -23,7 +23,7 @@ const ProtectedRoute = ({ children, permission }) => {
     // et ne doit PAS être utilisé en production.
     // Afficher un avertissement dans la console pour rappeler l'usage local.
     // eslint-disable-next-line no-console
-    console.warn('[DEV BYPASS] ProtectedRoute rendu en mode dev (dev_admin=true)');
+    
     return children;
   }
 

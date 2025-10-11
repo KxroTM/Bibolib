@@ -34,7 +34,7 @@ const AdminLoansPage = () => {
       setActiveLoans(loansResponse.data || []);
       
     } catch (err) {
-      console.error('Erreur lors du chargement:', err);
+      
       setError('Erreur lors du chargement des données');
     } finally {
       setSearching(false);
@@ -64,7 +64,7 @@ const AdminLoansPage = () => {
       await loadData(searchUsername, searchBook);
       toast.success('Livre marqué comme rendu avec succès');
     } catch (err) {
-      console.error('Erreur lors du retour:', err);
+      
       toast.error(err.response?.data?.message || 'Erreur lors du retour du livre');
     }
   };

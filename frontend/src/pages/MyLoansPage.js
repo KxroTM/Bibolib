@@ -53,7 +53,7 @@ const MyLoansPage = () => {
       setReservations(reservationsResponse.data || []);
       
     } catch (err) {
-      console.error('Erreur lors du chargement des données:', err);
+      
       setError('Erreur lors du chargement des données');
     } finally {
       setLoading(false);
@@ -66,7 +66,7 @@ const MyLoansPage = () => {
       await loadUserData(); // Recharger les données
       toast.success('Demande de prolongation envoyée avec succès');
     } catch (err) {
-      console.error('Erreur lors de la demande de prolongation:', err);
+      
       toast.error(err.response?.data?.message || 'Erreur lors de la demande de prolongation');
     }
   };
@@ -77,7 +77,7 @@ const MyLoansPage = () => {
       await loadUserData(); // Recharger les données
       toast.success('Réservation annulée avec succès');
     } catch (err) {
-      console.error('Erreur lors de l\'annulation:', err);
+      
       toast.error(err.response?.data?.message || 'Erreur lors de l\'annulation');
     }
   };

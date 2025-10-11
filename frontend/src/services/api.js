@@ -20,13 +20,6 @@ api.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
-      // Debug: afficher en dev si le token est présent lors des requêtes
-      try {
-        if (process.env.NODE_ENV === 'development') {
-          // eslint-disable-next-line no-console
-          console.debug('[api] Request', config.method?.toUpperCase(), config.url, 'token?', !!token);
-        }
-      } catch (e) { /* noop */ }
       return config;
     },
     (error) => {
@@ -139,6 +132,25 @@ export const libraryService = {
 
 // Service des livres
 export const bookService = {
+  // Récupérer tous les livres (public - pas besoin d'auth)
+  getAll: (params = {}) => {
+    return api.get('/books', { params })
+      .then(res => {
+        // Format cohérent avec adminService.getBooks
+        if (res.data && Array.isArray(res.data.books)) {
+          return { data: res.data };
+        }
+        // Fallback si format différent
+        if (Array.isArray(res.data)) {
+          return { data: { books: res.data, total: res.data.length } };
+        }
+        return { data: { books: [], total: 0 } };
+      })
+      .catch(err => {
+        return { data: { books: [], total: 0 }, error: err };
+      });
+  },
+
   search: (query, params = {}) => {
     return api.get(API_CONFIG.endpoints.booksSearch, { params: { q: query, ...params } })
       .then(res => {
@@ -192,8 +204,8 @@ export const bookService = {
 
 // Service d'administration (CRUD réactivé)
 export const adminService = {
-  // Livres
-  getBooks: (params = {}) => api.get(API_CONFIG.endpoints.books, { params })
+  // Livres - utiliser l'endpoint admin pour avoir les noms des bibliothèques
+  getBooks: (params = {}) => api.get('/admin/books', { params })
     .then(res => {
       const data = res.data;
       // Nouveau backend renvoie {books, totalPages, currentPage, total}
@@ -229,13 +241,28 @@ export const adminService = {
   updateLibrary: (id, payload) => api.put(`${API_CONFIG.endpoints.libraries}/${id}`, payload),
   deleteLibrary: (id) => api.delete(`${API_CONFIG.endpoints.libraries}/${id}`),
 
-  // Utilisateurs (fallback /users)
-  getUsers: () => api.get('/users')
-    .then(res => ({ data: Array.isArray(res.data) ? res.data : [] }))
-    .catch(() => ({ data: [] })),
+  // Utilisateurs (Admin avec pagination et recherche)
+  getUsers: (params = {}) => {
+    const finalParams = { limit: 50, ...params };
+    return api.get(API_CONFIG.endpoints.adminUsers, { params: finalParams })
+      .then(res => {
+        const d = res.data;
+        if (d && Array.isArray(d.users)) {
+          return { data: d.users, meta: { total: d.total, totalPages: d.totalPages, currentPage: d.currentPage } };
+        }
+        if (Array.isArray(d)) return { data: d };
+        return { data: [] };
+      })
+      .catch(() => ({ data: [] }));
+  },
   createUser: (payload) => api.post('/users', payload), // legacy user creation
   updateUser: (id, payload) => api.put(`/users/${id}`, payload),
   deleteUser: (id) => api.delete(`/users/${id}`),
+
+  // Gestion des rôles utilisateurs
+  assignRoleToUser: (userId, roleId) => api.post(`/admin/users/${userId}/roles`, { role_id: roleId }),
+  removeRoleFromUser: (userId, roleId) => api.delete(`/admin/users/${userId}/roles/${roleId}`),
+  getRoles: () => api.get('/admin/roles').then(res => ({ data: res.data.roles || [] })),
 
   // Réservations et emprunts - nouveau système
   getReservations: () => Promise.resolve({ data: [] }),

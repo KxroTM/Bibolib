@@ -28,8 +28,8 @@ const HomePage = () => {
     try {
       setLoading(true);
       
-      // Récupérer les livres depuis la base de données (comme dans BooksPage)
-      const response = await adminService.getBooks({
+      // Récupérer les livres depuis l'endpoint public (pas besoin d'auth)
+      const response = await bookService.getAll({
         page: 1,
         limit: 1000 // Récupérer TOUS les livres pour pouvoir dédupliquer correctement
       });
@@ -42,8 +42,6 @@ const HomePage = () => {
       } else if (Array.isArray(responseData)) {
         books = responseData;
       }
-
-      console.log('📚 Livres récupérés depuis la DB:', books.length);
 
       if (books.length > 0) {
         // Fonction pour dédupliquer les livres basés sur titre + auteur + éditeur
@@ -62,7 +60,6 @@ const HomePage = () => {
 
         // Nouveaux livres - avec déduplication et filtre sur l'année
         const booksWithYear = books.filter(book => book.year && book.year !== null);
-        console.log('📚 Livres avec année:', booksWithYear.length);
         
         const recentBooksBeforeDedup = [...booksWithYear]
           .sort((a, b) => {
@@ -70,11 +67,9 @@ const HomePage = () => {
             const yearB = parseInt(b.year) || 0;
             return yearB - yearA; // Plus récent d'abord
           });
-        console.log('📚 Livres triés par année:', recentBooksBeforeDedup.length);
         
         // Appliquer la déduplication SEULEMENT aux nouveautés
         const recentBooksDedup = deduplicateBooks(recentBooksBeforeDedup);
-        console.log('📚 Nouveautés après déduplication:', recentBooksDedup.length);
         
         setNewBooks(recentBooksDedup.slice(0, 8));
 
@@ -83,7 +78,6 @@ const HomePage = () => {
         setBestRatedBooks(shuffled.slice(0, 8));
       } else {
         // Fallback sur les données de démonstration si aucun livre en DB
-        console.log('⚠️ Aucun livre en DB, utilisation des données de démo');
         const demoRecentBooks = demoBooks
           .filter(book => book.isNew || book.addedAt)
           .sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0))
@@ -98,7 +92,6 @@ const HomePage = () => {
       }
       
     } catch (error) {
-      console.error('Erreur lors du chargement des livres:', error);
       toast.error('Erreur lors du chargement des livres');
       
       // Fallback sur les données de démonstration en cas d'erreur
@@ -134,11 +127,9 @@ const HomePage = () => {
       const response = await bookService.search(query);
       const results = response.data || [];
       
-      console.log('🔍 Résultats de recherche:', results.length);
       setSearchResults(results);
       
     } catch (error) {
-      console.error('Erreur lors de la recherche:', error);
       toast.error('Erreur lors de la recherche');
       
       // Fallback sur les données de démonstration en cas d'erreur
@@ -148,7 +139,6 @@ const HomePage = () => {
         (book.genre || '').toLowerCase().includes(query.toLowerCase())
       );
       setSearchResults(results);
-      console.error('Erreur lors de la recherche:', error);
       toast.error('Erreur lors de la recherche');
     } finally {
       setSearching(false);

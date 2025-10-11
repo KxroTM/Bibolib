@@ -24,6 +24,19 @@ const LibrariesPage = () => {
     loadArrondissements();
   }, [currentPage, selectedArrondissement]);
 
+  // UseEffect pour la recherche avec debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      } else {
+        loadLibraries();
+      }
+    }, 300); // Délai de 300ms
+
+    return () => clearTimeout(timeoutId);
+  }, [librariesQuery]);
+
   const loadLibraries = async () => {
     try {
       setLoading(true);
@@ -35,7 +48,7 @@ const LibrariesPage = () => {
       setLibraries(libs);
       setTotalPages(tp);
     } catch (error) {
-      console.error('Erreur lors du chargement des bibliothèques:', error);
+      
       toast.error('Erreur lors du chargement des bibliothèques');
     } finally {
       setLoading(false);
@@ -53,7 +66,7 @@ const LibrariesPage = () => {
       const response = await libraryService.getArrondissements();
       setArrondissements(response.data);
     } catch (error) {
-      console.error('Erreur lors du chargement des arrondissements:', error);
+      
     }
   };
 

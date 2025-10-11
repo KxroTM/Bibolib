@@ -40,7 +40,7 @@ const AdminReservationsPage = () => {
       setPendingExtensions(extensionsResponse.data || []);
       
     } catch (err) {
-      console.error('Erreur lors du chargement:', err);
+      
       setError('Erreur lors du chargement des données');
     } finally {
       setSearching(false);
@@ -69,7 +69,7 @@ const AdminReservationsPage = () => {
       await loadData(searchUsername, searchBook);
       toast.success('Pré-réservation rejetée avec succès');
     } catch (err) {
-      console.error('Erreur lors du rejet:', err);
+      
       toast.error(err.response?.data?.message || 'Erreur lors du rejet');
     }
   };
@@ -80,7 +80,7 @@ const AdminReservationsPage = () => {
       await loadData(searchUsername, searchBook);
       toast.success('Emprunt validé avec succès');
     } catch (err) {
-      console.error('Erreur lors de la validation:', err);
+      
       toast.error(err.response?.data?.message || 'Erreur lors de la validation');
     }
   };
@@ -91,7 +91,7 @@ const AdminReservationsPage = () => {
       await loadData();
       toast.success(`Prolongation de ${days} jours accordée`);
     } catch (err) {
-      console.error('Erreur lors de l\'accord de prolongation:', err);
+      
       toast.error(err.response?.data?.message || 'Erreur lors de l\'accord de prolongation');
     }
   };
@@ -102,7 +102,7 @@ const AdminReservationsPage = () => {
       await loadData();
       toast.success('Demande de prolongation refusée');
     } catch (err) {
-      console.error('Erreur lors du refus:', err);
+      
       toast.error(err.response?.data?.message || 'Erreur lors du refus');
     }
   };

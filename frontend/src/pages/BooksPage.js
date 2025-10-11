@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import BookCard from '../components/BookCard';
 import Loader from '../components/Loader';
-import { adminService } from '../services/api';
+import { bookService } from '../services/api';
 import { getLibraryBackground } from '../utils/libraryBackgrounds';
 import { toast } from 'react-toastify';
 
@@ -28,15 +28,15 @@ const BooksPage = () => {
     try {
       setLoading(true);
       
-      console.log('🔍 Chargement des livres...');
+      
       
       // Récupérer TOUS les livres d'abord (sans pagination côté serveur)
-      const response = await adminService.getBooks({
+      const response = await bookService.getAll({
         page: 1,
         limit: 1000 // Récupérer beaucoup de livres d'un coup
       });
       
-      console.log('📦 Réponse reçue:', response);
+      
       
       const responseData = response.data;
       let rawBooks = [];
@@ -47,7 +47,7 @@ const BooksPage = () => {
         rawBooks = responseData;
       }
       
-      console.log('� Livres bruts récupérés:', rawBooks.length);
+      
       
       // Dédupliquer les livres par titre (garder le premier de chaque titre)
       const uniqueBooks = [];
@@ -61,16 +61,16 @@ const BooksPage = () => {
         }
       });
       
-      console.log('🔄 Livres après déduplication:', uniqueBooks.length);
+      
       
   // Stocker tous les livres uniques (la pagination et le filtrage
   // se feront côté client dans un useEffect séparé)
   setAllBooks(uniqueBooks);
       
-      console.log('🔢 Livres stockés en local :', uniqueBooks.length);
+      
       
     } catch (error) {
-      console.error('❌ Erreur lors du chargement des livres:', error);
+      
       toast.error('Erreur lors du chargement des livres');
       setBooks([]);
       setAllBooks([]);
@@ -85,13 +85,13 @@ const BooksPage = () => {
     
     if (!pageFromUrl) {
       // Pas de paramètre page dans l'URL, rediriger vers page 1
-      console.log('🔄 Pas de paramètre page, redirection vers page 1');
+      
       navigate('/livres?page=1', { replace: true });
       setCurrentPage(1);
     } else {
       // Il y a un paramètre page dans l'URL
       const pageNumber = parseInt(pageFromUrl) || 1;
-      console.log('🔄 Paramètre page trouvé:', pageNumber);
+      
       setCurrentPage(pageNumber);
     }
   }, [location.pathname, location.search]); // Se déclenche à chaque changement d'URL complet
