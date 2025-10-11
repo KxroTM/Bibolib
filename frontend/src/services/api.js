@@ -293,6 +293,11 @@ export const adminService = {
   getActiveLoans: (params = {}) => api.get('/admin/loans/active', { params }),
   returnLoan: (reservationId) => api.post(`/admin/loans/${reservationId}/return`),
   
+  // Gestion des pénalités
+  addPenalty: (reservationId, penaltyData) => api.post(`/admin/loans/${reservationId}/add-penalty`, penaltyData),
+  getUserPenalties: (userId) => api.get(`/admin/users/${userId}/penalties`),
+  unblockUser: (userId) => api.post(`/admin/users/${userId}/unblock`),
+  
   // Endpoint de retour de livre (admin) - legacy
   returnBook: (bookId) => api.post(`/books/${bookId}/return`),
   

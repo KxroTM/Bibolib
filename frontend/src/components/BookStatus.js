@@ -1,10 +1,12 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
 import ReservationTimer from './ReservationTimer';
 
 const BookStatus = ({ book, onReserve, onCancelReservation, onBorrow, onReturn, onRequestExtension }) => {
   const { user } = useAuth();
+  const { hasPermission } = usePermissions();
   const navigate = useNavigate();
   
   const getStatusDisplay = () => {
@@ -77,6 +79,33 @@ const BookStatus = ({ book, onReserve, onCancelReservation, onBorrow, onReturn, 
   const isMyBorrow = book.status === 'borrowed' && book.borrowedBy === user?.id;
 
   const renderActions = () => {
+    // Vérifier si l'utilisateur peut réserver
+    if (!user) {
+      return (
+        <div className="text-center space-y-2">
+          <p className="text-sm text-gray-600">Connectez-vous pour réserver ce livre</p>
+          <button
+            onClick={() => navigate('/login')}
+            className="w-full btn-primary text-sm py-2"
+          >
+            Se connecter
+          </button>
+        </div>
+      );
+    }
+
+    if (!hasPermission('RESERVATION_CREATE')) {
+      return (
+        <div className="bg-red-50 border border-red-200 p-3 rounded">
+          <div className="text-red-800 text-sm text-center">
+            <p className="font-semibold">⚠️ Réservations suspendues</p>
+            <p className="mt-1">Votre compte ne permet pas les réservations.</p>
+            <p className="text-xs mt-2">Contactez votre bibliothèque pour plus d'informations.</p>
+          </div>
+        </div>
+      );
+    }
+
     if (book.status === 'available') {
       return (
         <div className="space-y-2">

@@ -5,12 +5,14 @@ export const usePermissions = () => {
 
   const hasPermission = (permissionName) => {
     if (!user || !user.permissions) return false;
-    return user.permissions.some(perm => perm.name === permissionName);
+    // Les permissions sont un array de strings, pas d'objets
+    return user.permissions.includes(permissionName);
   };
 
   const hasRole = (roleName) => {
     if (!user || !user.roles) return false;
-    return user.roles.some(role => role.name === roleName);
+    // Les rôles sont un array de strings, pas d'objets
+    return user.roles.includes(roleName);
   };
 
   const hasAnyPermission = (permissionNames) => {

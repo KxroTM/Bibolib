@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { bookService, adminService, libraryService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import Loader from '../components/Loader';
 import BookStatus from '../components/BookStatus';
 import { toast } from 'react-toastify';
@@ -9,6 +10,7 @@ import { toast } from 'react-toastify';
 const BookDetailPage = () => {
   const { id } = useParams();
   const { user } = useAuth();
+  const { hasPermission } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
   const [book, setBook] = useState(null);

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import { usePermissions } from '../hooks/usePermissions';
 import Loader from '../components/Loader';
 import { adminService } from '../services/api';
 import axios from 'axios';
 import API_CONFIG from '../config';
 
 const RolesPermissionsPage = () => {
+  const { hasPermission } = usePermissions();
   const [activeTab, setActiveTab] = useState('roles');
   const [loading, setLoading] = useState(false);
   
@@ -23,23 +25,6 @@ const RolesPermissionsPage = () => {
   // Formulaires
   const [roleForm, setRoleForm] = useState({ name: '', description: '' });
   const [permissionForm, setPermissionForm] = useState({ name: '', description: '' });
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([
-        loadRoles(),
-        loadPermissions(),
-        loadUsers()
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadRoles = async () => {
     try {
@@ -74,11 +59,50 @@ const RolesPermissionsPage = () => {
   const loadUsers = async () => {
     try {
       const response = await adminService.getUsers();
-      setUsers(response.data || []);
+      setUsers(response.data.users || []);
     } catch (error) {
       
+      toast.error('Erreur lors du chargement des utilisateurs');
     }
   };
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        loadRoles(),
+        loadPermissions(),
+        loadUsers()
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Vérification des permissions au niveau de la page
+  if (!hasPermission('SYSTEM_MAINTENANCE')) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
+          <div className="text-6xl mb-4">🔒</div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Accès refusé</h1>
+          <p className="text-gray-600 mb-4">
+            Vous n'avez pas les permissions nécessaires pour accéder à cette page.
+          </p>
+          <button 
+            onClick={() => window.history.back()}
+            className="btn btn-primary"
+          >
+            Retour
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const createRole = async (e) => {
     e.preventDefault();

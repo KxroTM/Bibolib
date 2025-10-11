@@ -46,7 +46,14 @@ from models import (
     user_has_permission,
     assign_permission_to_role,
     search_books_by_library,
-    get_books_by_bibliotheque_filtered
+    get_books_by_bibliotheque_filtered,
+    add_penalty,
+    get_user_penalties,
+    count_active_penalties,
+    check_if_user_should_be_sanctioned,
+    has_penalty_for_reservation,
+    count_total_penalties_ever,
+    reset_user_penalties_on_unblock
 )
 from models import get_user_by_username
 
@@ -208,6 +215,7 @@ def me():
     user = request.current_user
     roles = get_roles_for_user(user['id'])
     permissions = get_permissions_for_user(user['id'])
+    
     return jsonify({
         "id": user['id'],
         "username": user['username'],
@@ -297,11 +305,12 @@ def admin_list_users():
     rows = db.session.execute(text(base_sql), params).fetchall()
     users_raw = rows_to_dicts(rows)
 
-    # Enrichir avec les rôles
+    # Enrichir avec les rôles et permissions
     users = []
     for u in users_raw:
         uid = u.get('id')
         u['roles'] = get_roles_for_user(uid) if uid else []
+        u['permissions'] = get_permissions_for_user(uid) if uid else []
         users.append(u)
 
     total = db.session.execute(text(count_sql), {k: v for k, v in params.items() if k not in ['limit', 'offset']}).fetchone()[0]
@@ -1073,6 +1082,150 @@ def return_book_endpoint(reservation_id):
     })
     
     return jsonify({'message': 'Livre marqué comme rendu avec succès.'})
+
+@app.route('/admin/loans/<int:reservation_id>/add-penalty', methods=['POST'])
+@auth_required
+@permission_required("RESERVATION_MANAGE")
+def add_penalty_endpoint(reservation_id):
+    """Ajoute une pénalité pour retard d'un livre"""
+    from models import (get_reservation_by_id, get_role_by_name, assign_role_to_user, 
+                       remove_roles_for_user, has_penalty_for_reservation, count_total_penalties_ever)
+    
+    reservation = get_reservation_by_id(reservation_id)
+    if not reservation:
+        return jsonify({'message': 'Emprunt non trouvé'}), 404
+    
+    if reservation['status'] != 'borrowed':
+        return jsonify({'message': 'Ce livre n\'est pas actuellement emprunté'}), 400
+    
+    # Vérifier si cette réservation a déjà une pénalité
+    if has_penalty_for_reservation(reservation_id):
+        return jsonify({'message': 'Une pénalité a déjà été ajoutée pour ce livre'}), 400
+    
+    data = request.json or {}
+    reason = data.get('reason', 'Retard de retour de livre')
+    # Plus de système d'amende monétaire
+    
+    # Ajouter la pénalité (sans montant)
+    add_penalty(
+        user_id=reservation['user_id'],
+        reservation_id=reservation_id,
+        reason=reason,
+        amount=0,  # Pas d'amende
+        admin_id=request.current_user['id']
+    )
+    
+    # Vérifier si l'utilisateur doit être sanctionné (3+ pénalités)
+    should_be_sanctioned = check_if_user_should_be_sanctioned(reservation['user_id'])
+    
+    if should_be_sanctioned:
+        # Changer automatiquement de rôle user vers user_sanctioned
+        user_role = get_role_by_name('user')
+        sanctioned_role = get_role_by_name('user_sanctioned')
+        
+        if user_role and sanctioned_role:
+            try:
+                remove_roles_for_user(reservation['user_id'])
+                assign_role_to_user(reservation['user_id'], sanctioned_role['id'])
+                
+                total_penalties = count_total_penalties_ever(reservation['user_id'])
+                
+                send_activity_log("/admin/user-auto-sanctioned", {
+                    "admin_id": request.current_user['id'],
+                    "admin_username": request.current_user['username'],
+                    "user_id": reservation['user_id'],
+                    "active_penalty_count": count_active_penalties(reservation['user_id']),
+                    "total_penalty_count": total_penalties,
+                    "reason": "Sanctionné automatiquement après 3 pénalités",
+                    "ip": request.remote_addr or 'backend'
+                })
+                
+                return jsonify({
+                    'message': f'Pénalité ajoutée. Utilisateur automatiquement sanctionné (3+ pénalités).',
+                    'penalty_added': True,
+                    'user_sanctioned': True,
+                    'active_penalty_count': count_active_penalties(reservation['user_id']),
+                    'total_penalty_count': total_penalties
+                })
+            except Exception as e:
+                print(f"Erreur lors de la sanction automatique: {e}")
+    
+    send_activity_log("/admin/penalty-added", {
+        "admin_id": request.current_user['id'],
+        "admin_username": request.current_user['username'],
+        "user_id": reservation['user_id'],
+        "book_id": reservation['book_id'],
+        "reservation_id": reservation_id,
+        "penalty_reason": reason,
+        "ip": request.remote_addr or 'backend'
+    })
+    
+    return jsonify({
+        'message': 'Pénalité ajoutée avec succès.',
+        'penalty_added': True,
+        'user_sanctioned': False,
+        'active_penalty_count': count_active_penalties(reservation['user_id']),
+        'total_penalty_count': count_total_penalties_ever(reservation['user_id'])
+    })
+
+@app.route('/admin/users/<int:user_id>/penalties', methods=['GET'])
+@auth_required
+@permission_required("USER_VIEW")
+def get_user_penalties_endpoint(user_id):
+    """Récupère les pénalités d'un utilisateur"""
+    penalties = get_user_penalties(user_id)
+    penalty_count = count_active_penalties(user_id)
+    
+    return jsonify({
+        'penalties': penalties,
+        'active_penalty_count': penalty_count,
+        'total_penalty_count': count_total_penalties_ever(user_id),
+        'is_sanctioned': penalty_count >= 3
+    })
+
+@app.route('/admin/users/<int:user_id>/unblock', methods=['POST'])
+@auth_required
+@permission_required("USER_MANAGE")
+def unblock_user_endpoint(user_id):
+    """Débloque un utilisateur sanctionné et archive ses pénalités actives"""
+    from models import (get_user_by_id, get_role_by_name, assign_role_to_user, 
+                       remove_roles_for_user, reset_user_penalties_on_unblock, count_total_penalties_ever)
+    
+    user = get_user_by_id(user_id)
+    if not user:
+        return jsonify({'message': 'Utilisateur non trouvé'}), 404
+    
+    # Vérifier si l'utilisateur est sanctionné
+    user_roles = get_roles_for_user(user_id)
+    if 'user_sanctioned' not in user_roles:
+        return jsonify({'message': 'Cet utilisateur n\'est pas sanctionné'}), 400
+    
+    # Archiver les pénalités actives
+    reset_user_penalties_on_unblock(user_id)
+    
+    # Changer le rôle de user_sanctioned vers user
+    user_role = get_role_by_name('user')
+    if user_role:
+        remove_roles_for_user(user_id)
+        assign_role_to_user(user_id, user_role['id'])
+    
+    total_penalties = count_total_penalties_ever(user_id)
+    
+    send_activity_log("/admin/user-unblocked", {
+        "admin_id": request.current_user['id'],
+        "admin_username": request.current_user['username'],
+        "user_id": user_id,
+        "user_username": user['username'],
+        "total_penalty_count": total_penalties,
+        "ip": request.remote_addr or 'backend'
+    })
+    
+    return jsonify({
+        'message': f'Utilisateur {user["username"]} débloqué avec succès.',
+        'user_unblocked': True,
+        'active_penalty_count': 0,  # Remis à zéro
+        'total_penalty_count': total_penalties
+    })
 
 # =============== Endpoints utilisateur ===============
 @app.route('/my-loans', methods=['GET'])

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { adminService } from '../services/api';
 import Loader from '../components/Loader';
 import { toast } from 'react-toastify';
 
 const AdminReservationsPage = () => {
   const { user } = useAuth();
+  const { hasPermission } = usePermissions();
   const [pendingReservations, setPendingReservations] = useState([]);
   const [pendingExtensions, setPendingExtensions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,10 +20,10 @@ const AdminReservationsPage = () => {
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
-    if (user && user.permissions?.includes('RESERVATION_MANAGE')) {
+    if (user && hasPermission('RESERVATION_VIEW')) {
       loadData();
     }
-  }, [user]);
+  }, [user, hasPermission]);
 
   const loadData = async (username = '', book = '') => {
     try {
@@ -299,19 +301,23 @@ const AdminReservationsPage = () => {
                             </div>
                           </div>
                           
-                          <div className="mt-6 space-y-3">
-                            <button
-                              onClick={() => handleValidatePickup(reservation.id)}
-                              className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                            >
-                              ✅ Valider le retrait (commencer l'emprunt)
-                            </button>
-                            <button
-                              onClick={() => handleRejectReservation(reservation.id)}
-                              className="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-                            >
-                              ❌ Rejeter la pré-réservation
-                            </button>
+                          <div className="space-y-2">
+                            {hasPermission('RESERVATION_MANAGE') && (
+                              <>
+                                <button
+                                  onClick={() => handleValidatePickup(reservation.id)}
+                                  className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                                >
+                                  ✅ Valider le retrait (commencer l'emprunt)
+                                </button>
+                                <button
+                                  onClick={() => handleRejectReservation(reservation.id)}
+                                  className="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                                >
+                                  ❌ Rejeter la pré-réservation
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>

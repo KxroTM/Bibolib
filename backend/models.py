@@ -608,11 +608,13 @@ def get_active_loans(username_search=None, book_search=None):
     """Récupère tous les emprunts actifs avec recherche optionnelle"""
     base_sql = """
         SELECT r.*, b.titre as book_title, b.auteur as book_author, u.username, u.email as user_email,
-               bib.name as library_name, bib.adresse as library_address
+               bib.name as library_name, bib.adresse as library_address,
+               CASE WHEN p.id IS NOT NULL THEN 1 ELSE 0 END as has_active_penalty
         FROM reservations r 
         JOIN book b ON r.book_id = b.livre_id 
         JOIN users u ON r.user_id = u.id
         LEFT JOIN bibliotheques bib ON b.bibliotheque_id = bib.id
+        LEFT JOIN penalties p ON r.id = p.reservation_id AND p.archived_at IS NULL
         WHERE r.status = 'borrowed'
     """
     
@@ -920,6 +922,113 @@ def set_book_status(book_id, status):
     )
     db.session.commit()
 
+# ==========================
+# Système de Pénalités
+# ==========================
+def add_penalty(user_id, reservation_id, reason, amount, admin_id):
+    """Ajoute une pénalité à un utilisateur"""
+    db.session.execute(
+        text("""
+            INSERT INTO penalties (user_id, reservation_id, reason, amount, created_by_admin_id) 
+            VALUES (:user_id, :reservation_id, :reason, :amount, :admin_id)
+        """),
+        {
+            "user_id": user_id,
+            "reservation_id": reservation_id, 
+            "reason": reason,
+            "amount": amount,
+            "admin_id": admin_id
+        }
+    )
+    db.session.commit()
+
+def get_user_penalties(user_id, active_only=True):
+    """Récupère les pénalités d'un utilisateur"""
+    if active_only:
+        # Pénalités actives (moins de 6 mois, non archivées)
+        sql = """
+            SELECT p.*, b.titre as book_title, b.auteur as book_author, 
+                   u.username as admin_username
+            FROM penalties p 
+            LEFT JOIN reservations r ON p.reservation_id = r.id
+            LEFT JOIN book b ON r.book_id = b.livre_id
+            LEFT JOIN users u ON p.created_by_admin_id = u.id
+            WHERE p.user_id = :user_id 
+            AND p.created_at > DATE_SUB(NOW(), INTERVAL 6 MONTH)
+            AND p.archived_at IS NULL
+            ORDER BY p.created_at DESC
+        """
+    else:
+        # Toutes les pénalités
+        sql = """
+            SELECT p.*, b.titre as book_title, b.auteur as book_author,
+                   u.username as admin_username
+            FROM penalties p 
+            LEFT JOIN reservations r ON p.reservation_id = r.id
+            LEFT JOIN book b ON r.book_id = b.livre_id
+            LEFT JOIN users u ON p.created_by_admin_id = u.id
+            WHERE p.user_id = :user_id 
+            ORDER BY p.created_at DESC
+        """
+    
+    rows = db.session.execute(text(sql), {"user_id": user_id}).fetchall()
+    return [_row_to_dict(row) for row in rows]
+
+def count_active_penalties(user_id):
+    """Compte les pénalités actives d'un utilisateur (derniers 6 mois, non archivées)"""
+    row = db.session.execute(
+        text("""
+            SELECT COUNT(*) as count 
+            FROM penalties 
+            WHERE user_id = :user_id 
+            AND created_at > DATE_SUB(NOW(), INTERVAL 6 MONTH)
+            AND archived_at IS NULL
+        """),
+        {"user_id": user_id}
+    ).fetchone()
+    return row[0] if row else 0
+
+def check_if_user_should_be_sanctioned(user_id):
+    """Vérifie si un utilisateur doit être sanctionné (3+ pénalités)"""
+    penalty_count = count_active_penalties(user_id)
+    return penalty_count >= 3
+
+def has_penalty_for_reservation(reservation_id):
+    """Vérifie si une réservation a déjà une pénalité active (non archivée)"""
+    row = db.session.execute(
+        text("SELECT COUNT(*) as count FROM penalties WHERE reservation_id = :reservation_id AND archived_at IS NULL"),
+        {"reservation_id": reservation_id}
+    ).fetchone()
+    return row[0] > 0 if row else False
+
+def reset_user_penalties_on_unblock(user_id):
+    """Archive les pénalités actives quand un utilisateur est débloqué"""
+    # Nous allons ajouter un champ 'archived_at' pour garder une trace
+    try:
+        db.session.execute(text("ALTER TABLE penalties ADD COLUMN archived_at DATETIME"))
+        db.session.commit()
+    except:
+        pass  # La colonne existe déjà
+    
+    # Archiver les pénalités actives
+    db.session.execute(
+        text("""
+            UPDATE penalties 
+            SET archived_at = NOW() 
+            WHERE user_id = :user_id AND archived_at IS NULL
+        """),
+        {"user_id": user_id}
+    )
+    db.session.commit()
+
+def count_total_penalties_ever(user_id):
+    """Compte le nombre total de pénalités jamais reçues (pour historique)"""
+    row = db.session.execute(
+        text("SELECT COUNT(*) as count FROM penalties WHERE user_id = :user_id"),
+        {"user_id": user_id}
+    ).fetchone()
+    return row[0] if row else 0
+
 def create_all_tables():
     conn = db.session
     
@@ -976,6 +1085,24 @@ def create_all_tables():
     """))
 
     # ==========================
+    # Pénalités 
+    # ==========================
+    conn.execute(text("""
+    CREATE TABLE IF NOT EXISTS penalties (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        reservation_id INT NOT NULL,
+        reason VARCHAR(255) NOT NULL,
+        amount DECIMAL(8,2) DEFAULT 0.00,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_by_admin_id INT NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY(reservation_id) REFERENCES reservations(id) ON DELETE CASCADE,
+        FOREIGN KEY(created_by_admin_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """))
+
+    # ==========================
     # Bibliothèques
     # ==========================
     conn.execute(text("""
@@ -1022,8 +1149,74 @@ def create_all_tables():
         reserved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         due_date DATETIME NOT NULL,
         returned_at DATETIME,
+        status VARCHAR(50) DEFAULT 'pre_reserved',
+        picked_up_at DATETIME,
+        return_due_date DATETIME,
+        validated_by_admin_id INT,
+        extension_requested BOOLEAN DEFAULT FALSE,
+        extension_granted_until DATETIME,
+        cancelled_at DATETIME,
+        cancellation_reason TEXT,
         FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY(book_id) REFERENCES book(livre_id) ON DELETE CASCADE
+        FOREIGN KEY(book_id) REFERENCES book(livre_id) ON DELETE CASCADE,
+        FOREIGN KEY(validated_by_admin_id) REFERENCES users(id) ON DELETE SET NULL
+    )
+    """))
+    
+    # Ajouter les colonnes manquantes si elles n'existent pas
+    try:
+        conn.execute(text("ALTER TABLE reservations ADD COLUMN status VARCHAR(50) DEFAULT 'pre_reserved'"))
+    except:
+        pass
+    
+    try:
+        conn.execute(text("ALTER TABLE reservations ADD COLUMN picked_up_at DATETIME"))
+    except:
+        pass
+        
+    try:
+        conn.execute(text("ALTER TABLE reservations ADD COLUMN return_due_date DATETIME"))
+    except:
+        pass
+        
+    try:
+        conn.execute(text("ALTER TABLE reservations ADD COLUMN validated_by_admin_id INT"))
+    except:
+        pass
+        
+    try:
+        conn.execute(text("ALTER TABLE reservations ADD COLUMN extension_requested BOOLEAN DEFAULT FALSE"))
+    except:
+        pass
+        
+    try:
+        conn.execute(text("ALTER TABLE reservations ADD COLUMN extension_granted_until DATETIME"))
+    except:
+        pass
+        
+    try:
+        conn.execute(text("ALTER TABLE reservations ADD COLUMN cancelled_at DATETIME"))
+    except:
+        pass
+        
+    try:
+        conn.execute(text("ALTER TABLE reservations ADD COLUMN cancellation_reason TEXT"))
+    except:
+        pass
+
+    # ==========================
+    # Penalties
+    # ==========================
+    conn.execute(text("""
+    CREATE TABLE IF NOT EXISTS penalties (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        reason TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        added_by_admin_id INT NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY(added_by_admin_id) REFERENCES users(id) ON DELETE CASCADE
     )
     """))
     

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { adminService } from '../services/api';
 import Loader from '../components/Loader';
 import { toast } from 'react-toastify';
 
 const AdminLoansPage = () => {
   const { user } = useAuth();
+  const { hasPermission } = usePermissions();
   const [activeLoans, setActiveLoans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -19,7 +21,7 @@ const AdminLoansPage = () => {
     if (user && user.permissions?.includes('RESERVATION_MANAGE')) {
       loadData();
     }
-  }, [user]);
+  }, [user]); // Retire hasPermission des dépendances
 
   const loadData = async (username = '', book = '') => {
     try {
@@ -31,6 +33,7 @@ const AdminLoansPage = () => {
         username: username.trim() || undefined,
         book: book.trim() || undefined
       });
+      
       setActiveLoans(loansResponse.data || []);
       
     } catch (err) {
@@ -66,6 +69,30 @@ const AdminLoansPage = () => {
     } catch (err) {
       
       toast.error(err.response?.data?.message || 'Erreur lors du retour du livre');
+    }
+  };
+
+  const handleAddPenalty = async (loan) => {
+    const reason = prompt('Raison de la pénalité :', 'Retard de retour de livre');
+    if (!reason) return;
+    
+    if (!window.confirm(`Ajouter une pénalité à ${loan.username} pour "${reason}" ?`)) {
+      return;
+    }
+    
+    try {
+      const response = await adminService.addPenalty(loan.id, { reason });
+      
+      if (response.data.user_sanctioned) {
+        toast.success(`${response.data.message} L'utilisateur a été automatiquement sanctionné.`);
+      } else {
+        toast.success(`${response.data.message} (${response.data.active_penalty_count}/3 pénalités)`);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur lors de l\'ajout de la pénalité');
+    } finally {
+      // Toujours recharger les données pour mettre à jour l'interface
+      await loadData(searchUsername, searchBook);
     }
   };
 
@@ -247,13 +274,34 @@ const AdminLoansPage = () => {
                           </div>
                         </div>
                         
-                        <div className="mt-6">
-                          <button
-                            onClick={() => handleReturnBook(loan.id)}
-                            className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                          >
-                            📚 Marquer comme rendu
-                          </button>
+                        <div className="mt-6 space-y-3">
+                          {hasPermission('LOAN_MANAGE') && (
+                            <button
+                              onClick={() => handleReturnBook(loan.id)}
+                              className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              📚 Marquer comme rendu
+                            </button>
+                          )}
+                          
+                          {/* Bouton de pénalité pour les livres en retard */}
+                          {overdue && !Boolean(loan.has_active_penalty) && hasPermission('LOAN_MANAGE') && (
+                            <button
+                              onClick={() => handleAddPenalty(loan)}
+                              className="w-full bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center justify-center space-x-2"
+                            >
+                              <span>⚠️</span>
+                              <span>Ajouter une pénalité (retard)</span>
+                            </button>
+                          )}
+                          
+                          {/* Indicateur si pénalité déjà appliquée */}
+                          {overdue && Boolean(loan.has_active_penalty) && (
+                            <div className="w-full bg-red-100 text-red-800 px-4 py-2 rounded-lg border border-red-300 flex items-center justify-center space-x-2">
+                              <span>⛔</span>
+                              <span>Pénalité déjà appliquée</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -100,6 +100,7 @@ const AdminDashboard = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [availableRoles, setAvailableRoles] = useState([]);
   const [userRoles, setUserRoles] = useState({}); // Cache des rôles par utilisateur
+  const [userPermissions, setUserPermissions] = useState({}); // Cache des permissions par utilisateur
 
   // États de visibilité des modales de création
   const [showBookModal, setShowBookModal] = useState(false);
@@ -426,6 +427,48 @@ const AdminDashboard = () => {
     try { await adminService.deleteUser(id); toast.info('Utilisateur supprimé'); loadAdmins(); } catch(e){  toast.error('Suppression échouée'); }
   };
 
+  // Fonction pour sanctionner/réactiver un utilisateur (changer de rôle user ↔ user_sanctioned)
+  const handleToggleUserSanction = async (userId, currentCanReserve) => {
+    const action = currentCanReserve ? 'sanctionner' : 'réactiver';
+    if (!window.confirm(`Êtes-vous sûr de vouloir ${action} cet utilisateur ?`)) return;
+    
+    try {
+      if (currentCanReserve) {
+        // Changer de "user" vers "user_sanctioned"
+        const userRole = availableRoles.find(r => r.name === 'user');
+        const sanctionedRole = availableRoles.find(r => r.name === 'user_sanctioned');
+        
+        if (userRole && sanctionedRole) {
+          await adminService.removeRoleFromUser(userId, userRole.id);
+          await adminService.assignRoleToUser(userId, sanctionedRole.id);
+          toast.success('Utilisateur sanctionné - ne peut plus réserver');
+        }
+      } else {
+        // Changer de "user_sanctioned" vers "user" 
+        const userRole = availableRoles.find(r => r.name === 'user');
+        const sanctionedRole = availableRoles.find(r => r.name === 'user_sanctioned');
+        
+        if (userRole && sanctionedRole) {
+          await adminService.removeRoleFromUser(userId, sanctionedRole.id);
+          await adminService.assignRoleToUser(userId, userRole.id);
+          toast.success('Utilisateur réactivé - peut à nouveau réserver');
+        }
+      }
+      
+      // Recharger les données pour mettre à jour l'affichage
+      loadData();
+    } catch (error) {
+      console.error('Erreur lors de la modification de la sanction:', error);
+      toast.error(`Erreur lors de la ${action === 'sanctionner' ? 'sanction' : 'réactivation'}`);
+    }
+  };
+
+  // Fonction pour vérifier si un utilisateur peut réserver
+  const userCanReserve = (user) => {
+    // Les permissions sont maintenant des strings, pas des objets
+    return user.permissions?.includes('RESERVATION_CREATE') || false;
+  };
+
   // Fonctions de gestion des rôles
   const handleRoleChange = async (userId, roleId, action) => {
     try {
@@ -591,12 +634,14 @@ const AdminDashboard = () => {
                       <button className="btn" type="submit">Rechercher</button>
                       <button type="button" className="btn" onClick={()=>{ setBookQuery(''); setCurrentPage(1); loadBooks(); }}>Réinitialiser</button>
                     </form>
-                    <button 
-                      className="btn btn-primary"
-                      onClick={openBookModal}
-                    >
-                      Créer un livre
-                    </button>
+                    {hasPermission('BOOK_CREATE') && (
+                      <button 
+                        className="btn btn-primary"
+                        onClick={openBookModal}
+                      >
+                        Créer un livre
+                      </button>
+                    )}
                   </div>
 
                   {/* Liste des livres */}
@@ -657,8 +702,12 @@ const AdminDashboard = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             {!readOnly && (
                               <div className="flex items-center gap-3">
-                                <button className="text-blue-600 hover:underline text-xs" onClick={()=>startEditBook(book)}>Modifier</button>
-                                <button className="text-red-600 hover:underline text-xs" onClick={()=>handleDeleteBook(book.id)}>Supprimer</button>
+                                {hasPermission('BOOK_EDIT') && (
+                                  <button className="text-blue-600 hover:underline text-xs" onClick={()=>startEditBook(book)}>Modifier</button>
+                                )}
+                                {hasPermission('BOOK_DELETE') && (
+                                  <button className="text-red-600 hover:underline text-xs" onClick={()=>handleDeleteBook(book.id)}>Supprimer</button>
+                                )}
                               </div>
                             )}
                           </td>
@@ -679,12 +728,14 @@ const AdminDashboard = () => {
                       <button className="btn" type="submit">Rechercher</button>
                       <button type="button" className="btn" onClick={()=>{ setLibraryQuery(''); loadLibraries(); }}>Réinitialiser</button>
                     </form>
-                    <button 
-                      className="btn btn-primary"
-                      onClick={() => setShowLibraryModal(true)}
-                    >
-                      Créer une bibliothèque
-                    </button>
+                    {hasPermission('LIBRARY_CREATE') && (
+                      <button 
+                        className="btn btn-primary"
+                        onClick={() => setShowLibraryModal(true)}
+                      >
+                        Créer une bibliothèque
+                      </button>
+                    )}
                   </div>
 
                   {/* Liste des bibliothèques */}
@@ -705,8 +756,12 @@ const AdminDashboard = () => {
                         <div className="flex space-x-2 text-xs">
                           {!readOnly && (
                             <div className="flex items-center gap-3">
-                              <button className="text-blue-600 hover:underline" onClick={()=>startEditLibrary(library)}>Modifier</button>
-                              <button className="text-red-600 hover:underline" onClick={()=>handleDeleteLibrary(library.id)}>Supprimer</button>
+                              {hasPermission('LIBRARY_EDIT') && (
+                                <button className="text-blue-600 hover:underline" onClick={()=>startEditLibrary(library)}>Modifier</button>
+                              )}
+                              {hasPermission('LIBRARY_DELETE') && (
+                                <button className="text-red-600 hover:underline" onClick={()=>handleDeleteLibrary(library.id)}>Supprimer</button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -735,12 +790,14 @@ const AdminDashboard = () => {
                       </select>
                       <button type="button" className="btn" onClick={()=>{ setUserQuery(''); setRoleFilter(''); setCurrentPage(1); loadAdmins(); }}>Réinitialiser tout</button>
                     </div>
-                    <button 
-                      className="btn btn-primary"
-                      onClick={() => setShowUserModal(true)}
-                    >
-                      Créer un utilisateur
-                    </button>
+                    {hasPermission('USER_CREATE') && (
+                      <button 
+                        className="btn btn-primary"
+                        onClick={() => setShowUserModal(true)}
+                      >
+                        Créer un utilisateur
+                      </button>
+                    )}
                   </div>
 
                   <div className="overflow-x-auto">
@@ -780,7 +837,14 @@ const AdminDashboard = () => {
                                 </div>
                               </div>
                               <div className="ml-3">
-                                <div className="text-sm font-medium text-gray-900">{admin.username || admin.name || admin.email}</div>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {admin.username || admin.name || admin.email}
+                                  {!userCanReserve(admin) && (
+                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                      🚫 Sanctionné
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="text-sm text-gray-500">ID: {admin.id}</div>
                               </div>
                             </div>
@@ -825,18 +889,34 @@ const AdminDashboard = () => {
                             <div className="flex items-center space-x-2">
                               {!readOnly && (
                                 <>
-                                  <button
-                                    onClick={() => startEditUserRoles(admin)}
-                                    className="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                                  >
-                                    🔧 Rôles
-                                  </button>
-                                  <button 
-                                    className="text-red-600 hover:text-red-800 text-xs font-medium" 
-                                    onClick={()=>handleDeleteUser(admin.id)}
-                                  >
-                                    🗑️ Supprimer
-                                  </button>
+                                  {hasPermission('USER_MANAGE_ROLES') && (
+                                    <button
+                                      onClick={() => startEditUserRoles(admin)}
+                                      className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                                    >
+                                      🔧 Rôles
+                                    </button>
+                                  )}
+                                  {hasPermission('USER_MANAGE_ROLES') && (
+                                    <button
+                                      onClick={() => handleToggleUserSanction(admin.id, userCanReserve(admin))}
+                                      className={`text-xs font-medium ${
+                                        userCanReserve(admin) 
+                                          ? 'text-orange-600 hover:text-orange-800' 
+                                          : 'text-green-600 hover:text-green-800'
+                                      }`}
+                                    >
+                                      {userCanReserve(admin) ? '🚫 Sanctionner' : '✅ Réactiver'}
+                                    </button>
+                                  )}
+                                  {hasPermission('USER_DELETE') && (
+                                    <button 
+                                      className="text-red-600 hover:text-red-800 text-xs font-medium" 
+                                      onClick={()=>handleDeleteUser(admin.id)}
+                                    >
+                                      🗑️ Supprimer
+                                    </button>
+                                  )}
                                 </>
                               )}
                             </div>
