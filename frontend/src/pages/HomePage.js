@@ -1,22 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { bookService, adminService } from '../services/api';
 import { demoBooks } from '../services/demoData';
 import Loader from '../components/Loader';
 import BookCarousel from '../components/BookCarousel';
 import BookCard from '../components/BookCard';
-import SearchBar from '../components/SearchBar';
 import { getLibraryBackground } from '../utils/libraryBackgrounds';
 import NewBooksCarousel from '../components/NewBooksCarousel';
 import { toast } from 'react-toastify';
 
 const HomePage = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [newBooks, setNewBooks] = useState([]);
   const [bestRatedBooks, setBestRatedBooks] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     loadBooksData();
@@ -112,38 +110,11 @@ const HomePage = () => {
     }
   };
 
-  const handleSearch = useCallback(async (query) => {
-    if (!query) {
-      setSearchResults([]);
-      setSearchQuery('');
-      return;
+  const handleSearchSubmit = () => {
+    if (searchQuery.trim()) {
+      navigate(`/livres?search=${encodeURIComponent(searchQuery.trim())}`);
     }
-
-    try {
-      setSearching(true);
-      setSearchQuery(query);
-
-      // Utiliser l'API de recherche de livres
-      const response = await bookService.search(query);
-      const results = response.data || [];
-      
-      setSearchResults(results);
-      
-    } catch (error) {
-      toast.error('Erreur lors de la recherche');
-      
-      // Fallback sur les données de démonstration en cas d'erreur
-      const results = demoBooks.filter(book =>
-        book.title.toLowerCase().includes(query.toLowerCase()) ||
-        (book.author || '').toLowerCase().includes(query.toLowerCase()) ||
-        (book.genre || '').toLowerCase().includes(query.toLowerCase())
-      );
-      setSearchResults(results);
-      toast.error('Erreur lors de la recherche');
-    } finally {
-      setSearching(false);
-    }
-  }, []);
+  };
 
 
 
@@ -175,25 +146,22 @@ const HomePage = () => {
             Découvrez les livres des bibliothèques parisiennes
           </p>
           <div className="max-w-xl mx-auto mb-4">
-            <SearchBar
-              onSearch={handleSearch}
-              placeholder="Rechercher un livre (ex: Le Petit Prince)..."
-              className="w-full"
-            />
-            {/* Résultats de recherche: afficher bibliothèques contenant le livre */}
-            {searchResults && searchResults.length > 0 && (
-              <div className="mt-2 bg-white rounded-lg shadow-md max-w-2xl mx-auto">
-                {searchResults.map((b) => (
-                  <Link
-                    key={`${b.libraryId}-${b.id}`}
-                    to={`/bibliotheque/${b.libraryId}?bookId=${b.id}`}
-                    className="block px-4 py-3 text-black hover:bg-gray-100 border-b last:border-b-0"
-                  >
-                    {b.libraryName} - {b.title}
-                  </Link>
-                ))}
-              </div>
-            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearchSubmit()}
+                placeholder="Rechercher un livre (ex: Le Petit Prince)..."
+                className="flex-1 px-4 py-3 rounded-lg border-0 focus:ring-2 focus:ring-blue-500 text-gray-900"
+              />
+              <button
+                onClick={handleSearchSubmit}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Rechercher
+              </button>
+            </div>
           </div>
           <Link 
             to="/libraries" 

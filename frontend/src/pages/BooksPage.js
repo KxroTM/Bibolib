@@ -24,6 +24,14 @@ const BooksPage = () => {
   const [booksQuery, setBooksQuery] = useState('');
   const itemsPerPage = 20; // 20 livres par page pour une bonne expérience utilisateur
 
+  // Initialiser la recherche depuis l'URL au chargement
+  useEffect(() => {
+    const searchFromUrl = query.get('search');
+    if (searchFromUrl) {
+      setBooksQuery(searchFromUrl);
+    }
+  }, []);
+
   const loadBooks = async () => {
     try {
       setLoading(true);
@@ -130,7 +138,14 @@ const BooksPage = () => {
   const onBooksSearch = (e) => {
     e && e.preventDefault && e.preventDefault();
     setCurrentPage(1);
-    // le filtrage est automatique via booksQuery
+    
+    // Mettre à jour l'URL avec le paramètre de recherche
+    const searchParams = new URLSearchParams();
+    searchParams.set('page', '1');
+    if (booksQuery.trim()) {
+      searchParams.set('search', booksQuery.trim());
+    }
+    navigate(`/livres?${searchParams.toString()}`, { replace: true });
   };
 
   const handlePageChange = (page) => {
@@ -138,8 +153,14 @@ const BooksPage = () => {
     if (page === currentPage) return;
     
     setCurrentPage(page);
-    // Mettre à jour l'URL avec le numéro de page
-    navigate(`/livres?page=${page}`, { replace: true });
+    
+    // Mettre à jour l'URL en conservant les paramètres de recherche
+    const searchParams = new URLSearchParams();
+    searchParams.set('page', page.toString());
+    if (booksQuery.trim()) {
+      searchParams.set('search', booksQuery.trim());
+    }
+    navigate(`/livres?${searchParams.toString()}`, { replace: true });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
