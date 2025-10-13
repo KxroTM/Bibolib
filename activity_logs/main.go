@@ -75,6 +75,39 @@ func InsertLog(ctx context.Context, userID int, username, module, action, status
 	return err
 }
 
+func InsertLogbook(ctx context.Context, userID int, BookID int, username, module, action, status, ip string) error {
+	logDoc := bson.M{
+		"user_id":   userID,
+		"book_id":   BookID,
+		"username":  username,
+		"module":    module,
+		"action":    action,
+		"ip":        ip,
+		"timestamp": time.Now(),
+		"status":    status,
+	}
+
+	_, err := logCollection.InsertOne(ctx, logDoc)
+	return err
+}
+
+func InsertLogRole(ctx context.Context, userID int, NewRoles, OldRoles []string, adminName, module, action, status, ip string) error {
+	logDoc := bson.M{
+		"user_id":    userID,
+		"NewRoles":   NewRoles,
+		"OldRoles":   OldRoles,
+		"admin_name": adminName,
+		"module":     module,
+		"action":     action,
+		"ip":         ip,
+		"timestamp":  time.Now(),
+		"status":     status,
+	}
+
+	_, err := logCollection.InsertOne(ctx, logDoc)
+	return err
+}
+
 // -------------------------
 // MAIN
 // -------------------------
@@ -159,14 +192,15 @@ func main() {
 			UserID   int      `json:"user_id"`
 			Username string   `json:"username"`
 			IP       string   `json:"ip"`
-			NewRoles []string `json:"newroles"`
-			OldRoles []string `json:"oldroles"`
+			NewRoles []string `json:"NewRoles"`
+			OldRoles []string `json:"OldRoles"`
+			Admin    string   `json:"AdminName"`
 		}{}
 		if err := c.ShouldBindJSON(&user); err != nil {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := UserRolesChange(ctx, user.UserID, user.Username, user.IP)
+		err := role_update(ctx, user.UserID, user.NewRoles, user.OldRoles, user.Admin, user.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return
@@ -218,17 +252,17 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		user := struct {
-			UserID   int    `json:"user_id"`
-			Username string `json:"username"`
-			BookID   int    `json:"book_id"`
-			Title    string `json:"title"`
-			IP       string `json:"ip"`
+			UserID    int                    `json:"user_id"`
+			Username  string                 `json:"username"`
+			BookID    int                    `json:"book_id"`
+			NewValues map[string]interface{} `json:"new_values"`
+			IP        string                 `json:"ip"`
 		}{}
 		if err := c.ShouldBindJSON(&user); err != nil {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := AddBook(ctx, user.UserID, user.Username, user.IP)
+		err := InsertLogbook(ctx, user.UserID, user.BookID, user.Username, "books", "ADD_BOOK", "success", user.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return
@@ -236,40 +270,23 @@ func main() {
 		c.JSON(200, gin.H{"message": "Add book log inséré"})
 	})
 
-	r.POST("/books/update-book", func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		user := struct {
-			UserID   int    `json:"user_id"`
-			Username string `json:"username"`
-			IP       string `json:"ip"`
-		}{}
-		if err := c.ShouldBindJSON(&user); err != nil {
-			c.JSON(400, gin.H{"error": "Données invalides"})
-			return
-		}
-		err := UpdateBook(ctx, user.UserID, user.Username, user.IP)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
-			return
-		}
-		c.JSON(200, gin.H{"message": "Update book log inséré"})
-	})
-
 	r.POST("/books/delete-book", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		user := struct {
-			UserID   int    `json:"user_id"`
-			BookID   int    `json:"book_id"`
-			Username string `json:"username"`
-			IP       string `json:"ip"`
+			UserID   int                    `json:"user_id"`
+			BookID   int                    `json:"book_id"`
+			Title    string                 `json:"title"`
+			Author   string                 `json:"author"`
+			Username string                 `json:"username"`
+			Previous map[string]interface{} `json:"previous_values"`
+			IP       string                 `json:"ip"`
 		}{}
 		if err := c.ShouldBindJSON(&user); err != nil {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := DeleteBook(ctx, user.UserID, user.Username, user.IP)
+		err := DeleteBook(ctx, user.UserID, user.BookID, user.Username, user.Previous, user.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return
@@ -282,6 +299,7 @@ func main() {
 		defer cancel()
 		user := struct {
 			UserID   int    `json:"user_id"`
+			BookID   int    `json:"book_id"`
 			Username string `json:"username"`
 			IP       string `json:"ip"`
 		}{}
@@ -289,7 +307,7 @@ func main() {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := BookStatusChange(ctx, user.UserID, user.Username, user.IP)
+		err := BookStatusChange(ctx, user.UserID, user.BookID, user.Username, user.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return
@@ -311,12 +329,41 @@ func main() {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := BOOK_RESERVED(ctx, user.UserID, user.Username, user.IP)
+		err := InsertLogbook(ctx, user.UserID, user.BookID, user.Username, "books", "BOOK_RESERVED", "success", user.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return
 		}
 		c.JSON(200, gin.H{"message": "Book reserved log inséré"})
+	})
+	r.POST("/books/edit-book", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		user := struct {
+			UserID       int                    `json:"user_id"`
+			BookID       int                    `json:"book_id"`
+			Title        string                 `json:"title"`
+			Author       string                 `json:"author"`
+			Username     string                 `json:"username"`
+			ChangeFields []string               `json:"changed_fields"`
+			OldValues    map[string]interface{} `json:"old_values"`
+			NewValues    map[string]interface{} `json:"new_values"`
+			IP           string                 `json:"ip"`
+		}{}
+		if err := c.ShouldBindJSON(&user); err != nil {
+			c.JSON(400, gin.H{"error": "Données invalides"})
+			return
+		}
+		change := map[string]interface{}{}
+		for _, f := range user.ChangeFields {
+			change[f] = true
+		}
+		err := UpdateBook(ctx, user.UserID, user.BookID, user.Username, change, user.OldValues, user.NewValues, user.IP)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
+			return
+		}
+		c.JSON(200, gin.H{"message": "Edit book log inséré"})
 	})
 
 	r.POST("/books/book-reserved-cancel", func(c *gin.Context) {
@@ -324,6 +371,7 @@ func main() {
 		defer cancel()
 		user := struct {
 			UserID   int    `json:"user_id"`
+			BookID   int    `json:"book_id"`
 			Username string `json:"username"`
 			IP       string `json:"ip"`
 		}{}
@@ -331,7 +379,7 @@ func main() {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := Book_Reserved_cancel(ctx, user.UserID, user.Username, user.IP)
+		err := InsertLogbook(ctx, user.UserID, user.BookID, user.Username, "books", "BOOK_RESERVED_CANCEL", "success", user.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return
@@ -352,7 +400,7 @@ func main() {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := Book_returned(ctx, user.UserID, user.Username, user.IP)
+		err := InsertLogbook(ctx, user.UserID, user.BookID, user.Username, "books", "BOOK_RETURNED", "success", user.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return
@@ -364,15 +412,17 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		admin := struct {
-			AdminID   int    `json:"admin_id"`
-			AdminName string `json:"admin_name"`
-			IP        string `json:"ip"`
+			AdminID   int      `json:"admin_id"`
+			AdminName string   `json:"admin_name"`
+			NewRoles  []string `json:"NewRoles"`
+			OldRoles  []string `json:"OldRoles"`
+			IP        string   `json:"ip"`
 		}{}
 		if err := c.ShouldBindJSON(&admin); err != nil {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := role_create(ctx, admin.AdminID, admin.AdminName, admin.IP)
+		err := role_create(ctx, admin.AdminID, admin.NewRoles, admin.OldRoles, admin.AdminName, admin.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return
@@ -384,15 +434,17 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		admin := struct {
-			AdminID   int    `json:"admin_id"`
-			AdminName string `json:"admin_name"`
-			IP        string `json:"ip"`
+			AdminID   int      `json:"admin_id"`
+			AdminName string   `json:"admin_name"`
+			NewRoles  []string `json:"NewRoles"`
+			OldRoles  []string `json:"OldRoles"`
+			IP        string   `json:"ip"`
 		}{}
 		if err := c.ShouldBindJSON(&admin); err != nil {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := role_update(ctx, admin.AdminID, admin.AdminName, admin.IP)
+		err := role_update(ctx, admin.AdminID, admin.NewRoles, admin.OldRoles, admin.AdminName, admin.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return
@@ -404,15 +456,17 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		admin := struct {
-			AdminID   int    `json:"admin_id"`
-			AdminName string `json:"admin_name"`
-			IP        string `json:"ip"`
+			AdminID   int      `json:"admin_id"`
+			AdminName string   `json:"admin_name"`
+			NewRoles  []string `json:"NewRoles"`
+			OldRoles  []string `json:"OldRoles"`
+			IP        string   `json:"ip"`
 		}{}
 		if err := c.ShouldBindJSON(&admin); err != nil {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := role_delete(ctx, admin.AdminID, admin.AdminName, admin.IP)
+		err := role_delete(ctx, admin.AdminID, admin.NewRoles, admin.OldRoles, admin.AdminName, admin.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return
@@ -424,15 +478,17 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		admin := struct {
-			AdminID   int    `json:"admin_id"`
-			AdminName string `json:"admin_name"`
-			IP        string `json:"ip"`
+			AdminID   int      `json:"admin_id"`
+			AdminName string   `json:"admin_name"`
+			NewRoles  []string `json:"NewRoles"`
+			OldRoles  []string `json:"OldRoles"`
+			IP        string   `json:"ip"`
 		}{}
 		if err := c.ShouldBindJSON(&admin); err != nil {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := role_assigned(ctx, admin.AdminID, admin.AdminName, admin.IP)
+		err := role_assigned(ctx, admin.AdminID, admin.NewRoles, admin.OldRoles, admin.AdminName, admin.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return
@@ -444,20 +500,112 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		admin := struct {
-			AdminID   int    `json:"admin_id"`
-			AdminName string `json:"admin_name"`
-			IP        string `json:"ip"`
+			AdminID   int      `json:"admin_id"`
+			AdminName string   `json:"admin_name"`
+			NewRoles  []string `json:"NewRoles"`
+			OldRoles  []string `json:"OldRoles"`
+			IP        string   `json:"ip"`
 		}{}
 		if err := c.ShouldBindJSON(&admin); err != nil {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := Role_removed(ctx, admin.AdminID, admin.AdminName, admin.IP)
+		err := Role_removed(ctx, admin.AdminID, admin.NewRoles, admin.OldRoles, admin.AdminName, admin.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return
 		}
 		c.JSON(200, gin.H{"message": "Role removed log inséré"})
+	})
+
+	// Aliases expected by backend
+	r.POST("/admin/role-assigned-to-user", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		payload := struct {
+			UserID    int      `json:"user_id"`
+			Username  string   `json:"username"`
+			OldRoles  []string `json:"OldRoles"`
+			NewRoles  []string `json:"NewRoles"`
+			AdminID   int      `json:"AdminID"`
+			AdminName string   `json:"AdminName"`
+			IP        string   `json:"ip"`
+		}{}
+		if err := c.ShouldBindJSON(&payload); err != nil {
+			c.JSON(400, gin.H{"error": "Données invalides"})
+			return
+		}
+		if err := role_assigned(ctx, payload.AdminID, payload.NewRoles, payload.OldRoles, payload.AdminName, payload.IP); err != nil {
+			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
+			return
+		}
+		c.JSON(200, gin.H{"message": "Role assigned log inséré"})
+	})
+
+	r.POST("/admin/role-removed-from-user", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		payload := struct {
+			UserID    int      `json:"user_id"`
+			Username  string   `json:"username"`
+			OldRoles  []string `json:"OldRoles"`
+			NewRoles  []string `json:"NewRoles"`
+			AdminID   int      `json:"AdminID"`
+			AdminName string   `json:"AdminName"`
+			IP        string   `json:"ip"`
+		}{}
+		if err := c.ShouldBindJSON(&payload); err != nil {
+			c.JSON(400, gin.H{"error": "Données invalides"})
+			return
+		}
+		if err := Role_removed(ctx, payload.AdminID, payload.NewRoles, payload.OldRoles, payload.AdminName, payload.IP); err != nil {
+			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
+			return
+		}
+		c.JSON(200, gin.H{"message": "Role removed log inséré"})
+	})
+
+	// Aliases for compatibility
+	r.POST("/books/book-reservation-cancelled", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		user := struct {
+			UserID   int    `json:"user_id"`
+			BookID   int    `json:"book_id"`
+			Username string `json:"username"`
+			IP       string `json:"ip"`
+		}{}
+		if err := c.ShouldBindJSON(&user); err != nil {
+			c.JSON(400, gin.H{"error": "Données invalides"})
+			return
+		}
+		err := InsertLogbook(ctx, user.UserID, user.BookID, user.Username, "books", "BOOK_RESERVED_CANCEL", "success", user.IP)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
+			return
+		}
+		c.JSON(200, gin.H{"message": "Book reserved cancel log inséré"})
+	})
+
+	r.POST("/admin/book-returned", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		user := struct {
+			UserID   int    `json:"user_id"`
+			BookID   int    `json:"book_id"`
+			Username string `json:"username"`
+			IP       string `json:"ip"`
+		}{}
+		if err := c.ShouldBindJSON(&user); err != nil {
+			c.JSON(400, gin.H{"error": "Données invalides"})
+			return
+		}
+		err := InsertLogbook(ctx, user.UserID, user.BookID, user.Username, "books", "BOOK_RETURNED", "success", user.IP)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
+			return
+		}
+		c.JSON(200, gin.H{"message": "Book returned log inséré"})
 	})
 
 	// -------------------------

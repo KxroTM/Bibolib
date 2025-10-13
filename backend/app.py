@@ -118,6 +118,15 @@ def auth_required(f):
         auth_header = request.headers.get("Authorization", "")
         
         if not auth_header.startswith("Bearer "):
+            try:
+                send_activity_log("/auth/unauthorized", {
+                    "reason": "missing_token",
+                    "path": request.path,
+                    "method": request.method,
+                    "ip": request.remote_addr or 'backend'
+                })
+            except Exception:
+                pass
             return jsonify({"message": "Token manquant"}), 401
             
         token = auth_header.split(" ", 1)[1]
@@ -127,11 +136,38 @@ def auth_required(f):
             user_id = int(data["sub"])  # Convertir le sub string en entier
             user = get_user_by_id(user_id)
             if not user:
+                try:
+                    send_activity_log("/auth/unauthorized", {
+                        "reason": "user_not_found",
+                        "path": request.path,
+                        "method": request.method,
+                        "ip": request.remote_addr or 'backend'
+                    })
+                except Exception:
+                    pass
                 return jsonify({"message": "Utilisateur introuvable"}), 401
             request.current_user = user
         except jwt.ExpiredSignatureError:
+            try:
+                send_activity_log("/auth/unauthorized", {
+                    "reason": "token_expired",
+                    "path": request.path,
+                    "method": request.method,
+                    "ip": request.remote_addr or 'backend'
+                })
+            except Exception:
+                pass
             return jsonify({"message": "Token expiré"}), 401
         except Exception as e:
+            try:
+                send_activity_log("/auth/unauthorized", {
+                    "reason": "invalid_token",
+                    "path": request.path,
+                    "method": request.method,
+                    "ip": request.remote_addr or 'backend'
+                })
+            except Exception:
+                pass
             return jsonify({"message": "Token invalide"}), 401
         return f(*args, **kwargs)
     return wrapper
@@ -155,12 +191,51 @@ def permission_required(permission_name):
         def wrapper(*args, **kwargs):
             user = getattr(request, 'current_user', None)
             if not user:
+                try:
+                    send_activity_log("/auth/unauthorized", {
+                        "reason": "no_current_user",
+                        "path": request.path,
+                        "method": request.method,
+                        "ip": request.remote_addr or 'backend'
+                    })
+                except Exception:
+                    pass
                 return jsonify({"message": "Non autorisé"}), 401
             if not user_has_permission(user['id'], permission_name):
+                try:
+                    send_activity_log("/auth/forbidden", {
+                        "user_id": user.get('id'),
+                        "username": user.get('username'),
+                        "required_permission": permission_name,
+                        "path": request.path,
+                        "method": request.method,
+                        "ip": request.remote_addr or 'backend'
+                    })
+                except Exception:
+                    pass
                 return jsonify({"message": f"Permission requise: {permission_name}"}), 403
             return f(*args, **kwargs)
         return wrapper
     return decorator
+
+# ==================
+# Error handlers
+# ==================
+@app.errorhandler(500)
+def handle_internal_error(e):
+    try:
+        user = getattr(request, 'current_user', None) or {}
+        send_activity_log("/errors/500", {
+            "path": request.path,
+            "method": request.method,
+            "user_id": user.get('id'),
+            "username": user.get('username'),
+            "ip": request.remote_addr or 'backend',
+            "error": str(e)
+        })
+    except Exception:
+        pass
+    return jsonify({"message": "Erreur interne du serveur"}), 500
 
 # ==================
 # Auth endpoints
@@ -332,6 +407,7 @@ def edit_user(user_id):
     if not u:
         return jsonify({'message': 'Utilisateur non trouvé'}), 404
     data = request.json or {}
+    old_roles = get_roles_for_user(user_id)
     update_user(user_id, username=data.get('username'), email=data.get('email'), password_plain=data.get('password'))
     # Optionnel: mise à jour des rôles
     if 'roles' in data and isinstance(data['roles'], list):
@@ -348,8 +424,9 @@ def edit_user(user_id):
         "user_id": user_id,
         "username": refreshed['username'],
         "ip": request.remote_addr or 'backend',
-        "oldroles": get_roles_for_user(user_id),
-        "newroles": refreshed_roles
+        "OldRoles": old_roles,
+        "NewRoles": refreshed_roles,
+        "AdminName": getattr(request, 'current_user', {}).get('username') if hasattr(request, 'current_user') else None
     })
     return jsonify({**refreshed, 'roles': refreshed_roles})
 
@@ -362,11 +439,8 @@ def remove_user(user_id):
         return jsonify({'message': 'Utilisateur non trouvé'}), 404
     delete_user(user_id)
     send_activity_log("/auth/delete-account", {
-        "user_id": user_id,
-        "username": u['username'],
-        "ip": request.remote_addr or 'backend'
-    })
-    send_activity_log("/auth/delete-account", {
+        "admin_id": getattr(request, 'current_user', {}).get('id') if hasattr(request, 'current_user') else None,
+        "admin_username": getattr(request, 'current_user', {}).get('username') if hasattr(request, 'current_user') else None,
         "user_id": user_id,
         "username": u['username'],
         "ip": request.remote_addr or 'backend'
@@ -385,13 +459,23 @@ def add_bibliotheque():
     required = ["name", "adresse"]
     if not all(data.get(k) for k in required):
         return jsonify({"message": "Champs manquants"}), 400
-    create_bibliotheque(
+    created = create_bibliotheque(
         name=data["name"],
         adresse=data["adresse"],
         telephone=data.get("telephone"),
         email=data.get("email"),
         arrondissement=data.get("arrondissement")
     )
+    try:
+        send_activity_log("/libraries/library-created", {
+            "admin_id": request.current_user['id'],
+            "admin_username": request.current_user['username'],
+            "library_id": created.get('id') if isinstance(created, dict) else None,
+            "name": data["name"],
+            "ip": request.remote_addr or 'backend'
+        })
+    except Exception:
+        pass
     return jsonify({"message": "Bibliothèque créée"}), 201
 
 @app.route("/bibliotheques/<int:biblio_id>", methods=["PUT"])
@@ -405,6 +489,16 @@ def edit_bibliotheque(biblio_id):
     update_fields = {k: v for k, v in payload.items() if v is not None}
     update_bibliotheque(biblio_id, **update_fields)
     updated = get_bibliotheque_by_id(biblio_id)
+    try:
+        send_activity_log("/libraries/library-updated", {
+            "admin_id": request.current_user['id'],
+            "admin_username": request.current_user['username'],
+            "library_id": biblio_id,
+            "changed_fields": list(update_fields.keys()),
+            "ip": request.remote_addr or 'backend'
+        })
+    except Exception:
+        pass
     return jsonify(updated)
 
 @app.route("/bibliotheques/<int:biblio_id>", methods=["DELETE"])
@@ -415,6 +509,16 @@ def remove_bibliotheque(biblio_id):
     if not b:
         return jsonify({"message": "Bibliothèque non trouvée"}), 404
     delete_bibliotheque(biblio_id)
+    try:
+        send_activity_log("/libraries/library-deleted", {
+            "admin_id": request.current_user['id'],
+            "admin_username": request.current_user['username'],
+            "library_id": biblio_id,
+            "name": b.get('name') if isinstance(b, dict) else None,
+            "ip": request.remote_addr or 'backend'
+        })
+    except Exception:
+        pass
     return jsonify({"message": "Bibliothèque supprimée"})
 
 @app.route("/bibliotheques/<int:biblio_id>", methods=["GET"])
@@ -701,7 +805,7 @@ def add_book():
         "user_id": request.current_user['id'],
         "username": request.current_user['username'],
         "book_id": new_book['id'],
-        "title": new_book['title'],
+        "new_values": new_book,
         "ip": request.remote_addr or 'backend'
     })
     return jsonify(new_book), 201
@@ -715,8 +819,25 @@ def edit_book(book_id):
         return jsonify({"message": "Livre non trouvé"}), 404
     payload = request.json or {}
     update_fields = {k: v for k, v in payload.items() if v is not None}
+    # Capturer les anciennes valeurs des champs modifiés
+    old_values = {k: b.get(k) for k in update_fields.keys()}
     update_book(book_id, **update_fields)
     updated = get_book_by_id(book_id)
+    new_values = {k: updated.get(k) for k in update_fields.keys()}
+    try:
+        send_activity_log("/books/edit-book", {
+            "user_id": request.current_user['id'],
+            "username": request.current_user['username'],
+            "book_id": book_id,
+            "title": updated.get('title'),
+            "author": updated.get('author'),
+            "changed_fields": list(update_fields.keys()),
+            "old_values": old_values,
+            "new_values": new_values,
+            "ip": request.remote_addr or 'backend'
+        })
+    except Exception:
+        pass
     return jsonify(updated)
 
 
@@ -734,6 +855,18 @@ def remove_book(book_id):
     book = get_book_by_id(book_id)
     if book:
         delete_book(book_id)
+        try:
+            send_activity_log("/books/delete-book", {
+                "user_id": request.current_user['id'],
+                "username": request.current_user['username'],
+                "book_id": book_id,
+                "title": book.get('title') if isinstance(book, dict) else None,
+                "author": book.get('author') if isinstance(book, dict) else None,
+                "previous_values": book if isinstance(book, dict) else None,
+                "ip": request.remote_addr or 'backend'
+            })
+        except Exception:
+            pass
         return jsonify({"message": "Livre supprimé"})
     send_activity_log("/books/delete-book", {
         "user_id": request.current_user['id'],
@@ -1073,9 +1206,9 @@ def return_book_endpoint(reservation_id):
     return_book_final(reservation_id)
     
     send_activity_log("/admin/book-returned", {
-        "admin_id": request.current_user['id'],
-        "admin_username": request.current_user['username'],
-        "user_id": reservation['user_id'],
+        "user_id": request.current_user['id'],
+        "username": request.current_user['username'],
+        "target_user_id": reservation['user_id'],
         "book_id": reservation['book_id'],
         "reservation_id": reservation_id,
         "ip": request.remote_addr or 'backend'
@@ -1316,9 +1449,9 @@ def return_book_by_book_id_endpoint(book_id):
     
     if returned:
         send_activity_log("/books/book-returned", {
-            "admin_id": request.current_user['id'],
-            "admin_username": request.current_user['username'],
-            "user_id": reservation['user_id'],
+            "user_id": request.current_user['id'],
+            "username": request.current_user['username'],
+            "target_user_id": reservation['user_id'],
             "book_id": book_id,
             "reservation_id": reservation['id'],
             "ip": request.remote_addr or 'backend'
@@ -1481,7 +1614,7 @@ def create_role_endpoint():
             
         create_role(name, description)
         
-        send_activity_log("/admin/role-created", {
+        send_activity_log("/auth/role-create", {
             "admin_id": request.current_user['id'],
             "admin_username": request.current_user['username'],
             "role_name": name,
@@ -1511,7 +1644,7 @@ def update_role_endpoint(role_id):
         )
         db.session.commit()
         
-        send_activity_log("/admin/role-updated", {
+        send_activity_log("/auth/role-update", {
             "admin_id": request.current_user['id'],
             "admin_username": request.current_user['username'],
             "role_id": role_id,
@@ -1542,7 +1675,7 @@ def delete_role_endpoint(role_id):
         db.session.execute(text("DELETE FROM roles WHERE id = :id"), {"id": role_id})
         db.session.commit()
         
-        send_activity_log("/admin/role-deleted", {
+        send_activity_log("/auth/role-delete", {
             "admin_id": request.current_user['id'],
             "admin_username": request.current_user['username'],
             "role_id": role_id,
@@ -1675,13 +1808,19 @@ def assign_role_to_user_endpoint(user_id):
         if existing:
             return jsonify({"error": "Ce rôle est déjà attribué à cet utilisateur"}), 400
             
+        # Capture roles before/after for logging
+        old_roles = get_roles_for_user(user_id)
         assign_role_to_user(user_id, role_id)
+        new_roles = get_roles_for_user(user_id)
+        target = get_user_by_id(user_id)
         
         send_activity_log("/admin/role-assigned-to-user", {
-            "admin_id": request.current_user['id'],
-            "admin_username": request.current_user['username'],
-            "user_id": user_id,
-            "role_id": role_id,
+            "UserID": user_id,
+            "Username": target['username'] if target else None,
+            "OldRoles": old_roles,
+            "NewRoles": new_roles,
+            "AdminID": request.current_user['id'],
+            "AdminName": request.current_user['username'],
             "ip": request.remote_addr or 'backend'
         })
         
@@ -1705,17 +1844,22 @@ def remove_role_from_user_endpoint(user_id, role_id):
             if admin_count <= 1:
                 return jsonify({"error": "Impossible de retirer le dernier administrateur"}), 400
         
+        old_roles = get_roles_for_user(user_id)
         db.session.execute(
             text("DELETE FROM role_user WHERE user_id = :uid AND role_id = :rid"),
             {"uid": user_id, "rid": role_id}
         )
         db.session.commit()
+        new_roles = get_roles_for_user(user_id)
+        target = get_user_by_id(user_id)
         
         send_activity_log("/admin/role-removed-from-user", {
-            "admin_id": request.current_user['id'],
-            "admin_username": request.current_user['username'],
-            "user_id": user_id,
-            "role_id": role_id,
+            "UserID": user_id,
+            "Username": target['username'] if target else None,
+            "OldRoles": old_roles,
+            "NewRoles": new_roles,
+            "AdminID": request.current_user['id'],
+            "AdminName": request.current_user['username'],
             "ip": request.remote_addr or 'backend'
         })
         

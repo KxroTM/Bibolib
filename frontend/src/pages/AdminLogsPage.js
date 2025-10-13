@@ -21,6 +21,39 @@ const AdminLogsPage = () => {
   const [selectedLog, setSelectedLog] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
+  // Helpers to safely extract and display a username from logs that may contain numbers/objects
+  const coerceToString = (v) => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number') return String(v);
+    if (typeof v === 'object') {
+      // Try common fields if user is an object
+      if (v.username) return String(v.username);
+      if (v.name) return String(v.name);
+      if (v.email) return String(v.email);
+      if (v.id) return String(v.id);
+      return '';
+    }
+    try { return String(v); } catch { return ''; }
+  };
+
+  const getDisplayUser = (l) => {
+    const val =
+      coerceToString(l?.username) ||
+      coerceToString(l?.user) ||
+      coerceToString(l?.user_id) ||
+      coerceToString(l?.AdminName) ||
+      coerceToString(l?.admin_name) ||
+      coerceToString(l?.AdminID) ||
+      coerceToString(l?.admin_id);
+    return val || 'Anonyme';
+  };
+
+  const getUserInitial = (l) => {
+    const name = getDisplayUser(l);
+    return name && name.length ? name.charAt(0).toUpperCase() : '?';
+  };
+
   const ACTION_OPTIONS = [
     'CREATE_ACCOUNT','USER_DELETE_ACCOUNT','USER_UPDATE','USER_ROLES_CHANGE','PASSWORD_CHANGE',
     'USER_DELETE','ADD_BOOK','UPDATE_BOOK','DELETE_BOOK','BOOK_STATUS_CHANGE','BOOK_RESERVED',
@@ -332,12 +365,12 @@ const AdminLogsPage = () => {
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-8 w-8">
                             <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-medium text-gray-700">
-                              {(l.username || l.user || l.user_id || '?').charAt(0).toUpperCase()}
+                              {getUserInitial(l)}
                             </div>
                           </div>
                           <div className="ml-3">
                             <div className="text-sm font-medium text-gray-900">
-                              {l.username || l.user || l.user_id || 'Anonyme'}
+                              {getDisplayUser(l)}
                             </div>
                           </div>
                         </div>
@@ -424,9 +457,9 @@ const AdminLogsPage = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Utilisateur</label>
                     <div className="p-3 bg-gray-50 rounded-md text-sm flex items-center">
                       <div className="h-6 w-6 rounded-full bg-gray-300 flex items-center justify-center text-xs font-medium text-gray-700 mr-2">
-                        {(selectedLog.username || selectedLog.user || selectedLog.user_id || '?').charAt(0).toUpperCase()}
+                        {getUserInitial(selectedLog)}
                       </div>
-                      {selectedLog.username || selectedLog.user || selectedLog.user_id || 'Anonyme'}
+                      {getDisplayUser(selectedLog)}
                     </div>
                   </div>
                   <div>
