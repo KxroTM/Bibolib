@@ -12,6 +12,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminLogsPage from './pages/AdminLogsPage';
 import AdminReservationsPage from './pages/AdminReservationsPage';
 import AdminLoansPage from './pages/AdminLoansPage';
+import HistoryPage from './pages/HistoryPage';
 import RolesPermissionsPage from './pages/RolesPermissionsPage';
 import BooksPage from './pages/BooksPage';
 import LibrariesPage from './pages/LibrariesPage';
@@ -105,7 +106,7 @@ function AppContent() {
           />
           <Route
             path="/admin/logs"
-            element={<ProtectedRoute permission="ADMIN_DASHBOARD"><AdminLogsPage /></ProtectedRoute>}
+            element={<ProtectedRoute permission="ADMIN_LOGS"><AdminLogsPage /></ProtectedRoute>}
           />
           <Route
             path="/admin/reservations"
@@ -115,10 +116,14 @@ function AppContent() {
             path="/admin/loans"
             element={<ProtectedRoute permission="RESERVATION_MANAGE"><AdminLoansPage /></ProtectedRoute>}
           />
+          <Route
+            path="/admin/history"
+            element={<ProtectedRoute permission="LOAN_MANAGE"><HistoryPage /></ProtectedRoute>}
+          />
           {/* Route système pour la maintenance */}
           <Route
             path="/system/maintenance"
-            element={<ProtectedRoute permission="ADMIN_DASHBOARD"><RolesPermissionsPage /></ProtectedRoute>}
+            element={<ProtectedRoute permission="SYSTEM_MAINTENANCE"><RolesPermissionsPage /></ProtectedRoute>}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

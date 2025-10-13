@@ -33,7 +33,6 @@ const Footer = () => {
             />
             </div>
 
-							<div className="w-10 h-10 bg-blue-600 text-white rounded flex items-center justify-center font-bold">B</div>
 							<span className="text-lg font-semibold">Bibliothèque numérique</span>
 
 						</Link>
@@ -92,7 +91,7 @@ const Footer = () => {
 				</div>
 
 				<div className="mt-6 pt-4 border-t text-xs text-gray-500 text-center">
-					© {new Date().getFullYear()} Bibliothèque numérique — Tous droits réservés • Conçu par ELias Giovanni Youssef Ilyes
+					© {new Date().getFullYear()} Bibliothèque numérique — Tous droits réservés • Conçu par Youssef Giovanni Elias Ilyes
 				</div>
 			</div>
 		</footer>

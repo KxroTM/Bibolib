@@ -265,7 +265,7 @@ export const adminService = {
   getRoles: () => api.get('/admin/roles').then(res => ({ data: res.data.roles || [] })),
 
   // Réservations et emprunts - nouveau système
-  getReservations: () => Promise.resolve({ data: [] }),
+  getReservations: (params = {}) => api.get('/admin/reservations/history', { params }),
   
   // Nouvelles fonctions pour le système de réservation
   reserveBook: (bookId) => api.post(`/books/${bookId}/reserve`),
@@ -291,6 +291,7 @@ export const adminService = {
   
   // Endpoints admin pour gestion des emprunts
   getActiveLoans: (params = {}) => api.get('/admin/loans/active', { params }),
+  getAllLoans: (params = {}) => api.get('/admin/loans/history', { params }),
   returnLoan: (reservationId) => api.post(`/admin/loans/${reservationId}/return`),
   
   // Gestion des pénalités

@@ -634,6 +634,58 @@ def get_active_loans(username_search=None, book_search=None):
     rows = db.session.execute(text(base_sql), params).fetchall()
     return [_row_to_dict(row) for row in rows]
 
+def get_loans_history(username_search=None):
+    """Récupère l'historique complet des emprunts (actifs + terminés)"""
+    base_sql = """
+        SELECT r.*, b.titre as book_title, b.auteur as book_author, u.username, u.email as user_email,
+               bib.name as library_name, bib.adresse as library_address,
+               r.picked_up_at, r.return_due_date, r.returned_at,
+               CASE WHEN p.id IS NOT NULL THEN 1 ELSE 0 END as has_active_penalty
+        FROM reservations r 
+        JOIN book b ON r.book_id = b.livre_id 
+        JOIN users u ON r.user_id = u.id
+        LEFT JOIN bibliotheques bib ON b.bibliotheque_id = bib.id
+        LEFT JOIN penalties p ON r.id = p.reservation_id AND p.archived_at IS NULL
+        WHERE r.status IN ('borrowed', 'returned')
+    """
+    
+    params = {}
+    
+    # Ajouter filtre de recherche par nom d'utilisateur
+    if username_search:
+        base_sql += " AND (u.username LIKE :username_search OR u.email LIKE :username_search)"
+        params['username_search'] = f"%{username_search}%"
+    
+    base_sql += " ORDER BY r.picked_up_at DESC"
+    
+    rows = db.session.execute(text(base_sql), params).fetchall()
+    return [_row_to_dict(row) for row in rows]
+
+def get_reservations_history(username_search=None):
+    """Récupère l'historique complet des réservations"""
+    base_sql = """
+        SELECT r.*, b.titre as book_title, b.auteur as book_author, u.username, u.email as user_email,
+               bib.name as library_name, bib.adresse as library_address,
+               r.reserved_at as created_at, r.picked_up_at as confirmed_at, r.status
+        FROM reservations r 
+        JOIN book b ON r.book_id = b.livre_id 
+        JOIN users u ON r.user_id = u.id
+        LEFT JOIN bibliotheques bib ON b.bibliotheque_id = bib.id
+        WHERE 1=1
+    """
+    
+    params = {}
+    
+    # Ajouter filtre de recherche par nom d'utilisateur
+    if username_search:
+        base_sql += " AND (u.username LIKE :username_search OR u.email LIKE :username_search)"
+        params['username_search'] = f"%{username_search}%"
+    
+    base_sql += " ORDER BY r.reserved_at DESC"
+    
+    rows = db.session.execute(text(base_sql), params).fetchall()
+    return [_row_to_dict(row) for row in rows]
+
 
 # ==========================
 # Reservations - Nouvelles fonctions

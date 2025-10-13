@@ -77,9 +77,9 @@ def send_activity_log(endpoint: str, payload: dict):
     try:
         r = requests.post(url, json=payload, timeout=2)
         if r.status_code >= 400:
-            print(f"[logs] Echec envoi {endpoint} status={r.status_code} body={r.text}")
+            pass  # Échec d'envoi des logs
     except Exception as e:
-        print(f"[logs] Erreur envoi {endpoint}: {e}")
+        pass  # Erreur d'envoi des logs
 
 # Helper conversion pour Row SQLAlchemy 2.0 -> dict
 def row_to_dict(row):
@@ -256,6 +256,7 @@ def register():
     send_activity_log("/auth/create-account", {
         "user_id": user['id'],
         "username": user['username'],
+        "email": data['email'],  # Utilisons l'email original au lieu de user['email']
         "ip": request.remote_addr or 'backend'
     })
     return jsonify({"token": token, "user": user}), 201
@@ -310,6 +311,13 @@ def add_user_legacy():
     if existing:
         return jsonify({"message": "Email déjà utilisé"}), 409
     user = create_user(data['username'], data['email'], data['password'])
+    # Envoi du log création de compte par admin (best effort)
+    send_activity_log("/auth/create-account", {
+        "user_id": user['id'],
+        "username": user['username'],
+        "email": user['email'],
+        "ip": request.remote_addr or 'backend'
+    })
     return jsonify({"message": "Utilisateur créé", "user": user}), 201
 
 @app.route("/users", methods=["GET"])
@@ -434,15 +442,19 @@ def edit_user(user_id):
 @auth_required
 @permission_required('USER_MANAGE')
 def remove_user(user_id):
+    # Récupérer les données AVANT de supprimer l'utilisateur
     u = get_user_by_id(user_id)
     if not u:
         return jsonify({'message': 'Utilisateur non trouvé'}), 404
+    
+    # Supprimer l'utilisateur APRÈS avoir récupéré les données
     delete_user(user_id)
+    
+    # Envoyer le log avec les bonnes données récupérées AVANT suppression
     send_activity_log("/auth/delete-account", {
-        "admin_id": getattr(request, 'current_user', {}).get('id') if hasattr(request, 'current_user') else None,
-        "admin_username": getattr(request, 'current_user', {}).get('username') if hasattr(request, 'current_user') else None,
         "user_id": user_id,
-        "username": u['username'],
+        "username": u.get('username', '') if u else '',
+        "email": u.get('email', '') if u else '',
         "ip": request.remote_addr or 'backend'
     })
     return jsonify({'message': 'Utilisateur supprimé'})
@@ -1107,6 +1119,20 @@ def get_pending_pickups_endpoint():
     pending = get_pending_pickups(username_search, book_search)
     return jsonify(pending)
 
+@app.route('/admin/reservations/history', methods=['GET'])
+@auth_required
+@permission_required("LOAN_MANAGE")
+def get_reservations_history():
+    """Récupère l'historique complet des réservations"""
+    from models import get_reservations_history
+    
+    username_search = request.args.get('username', None)
+    if username_search and username_search.strip() == '':
+        username_search = None
+    
+    reservations_history = get_reservations_history(username_search)
+    return jsonify(reservations_history)
+
 @app.route('/admin/reservations/<int:reservation_id>/validate', methods=['POST'])
 @auth_required
 @permission_required("RESERVATION_MANAGE")
@@ -1187,6 +1213,20 @@ def get_active_loans_endpoint():
     
     active_loans = get_active_loans(username_search, book_search)
     return jsonify(active_loans)
+
+@app.route('/admin/loans/history', methods=['GET'])
+@auth_required
+@permission_required("LOAN_MANAGE")
+def get_loans_history():
+    """Récupère l'historique complet des emprunts (actifs + terminés)"""
+    from models import get_loans_history
+    
+    username_search = request.args.get('username', None)
+    if username_search and username_search.strip() == '':
+        username_search = None
+    
+    loans_history = get_loans_history(username_search)
+    return jsonify(loans_history)
 
 @app.route('/admin/loans/<int:reservation_id>/return', methods=['POST'])
 @auth_required
@@ -1281,7 +1321,7 @@ def add_penalty_endpoint(reservation_id):
                     'total_penalty_count': total_penalties
                 })
             except Exception as e:
-                print(f"Erreur lors de la sanction automatique: {e}")
+                pass  # Erreur lors de la sanction automatique
     
     send_activity_log("/admin/penalty-added", {
         "admin_id": request.current_user['id'],
@@ -1899,14 +1939,12 @@ def seed_admin():
 
     if not existing:
         user = create_user(admin_username, admin_email, admin_pass, role_name='admin')
-        print("[seed] Admin créé:", user['email'])
         existing = user
     else:
         # Ensure user has admin role
         roles = get_roles_for_user(existing['id'])
         if 'admin' not in roles:
             assign_role_to_user(existing['id'], admin_role['id'])
-            print("[seed] Rôle admin ajouté à", existing['email'])
 
     # Ensure role has permission
     role_perms = set(get_permissions_for_role(admin_role['id']))
@@ -1914,7 +1952,6 @@ def seed_admin():
         if code not in role_perms:
             perm = get_permission_by_name(code)
             assign_permission_to_role(admin_role['id'], perm['id'])
-            print(f'[seed] Permission {code} associée au rôle admin')
 
 if __name__ == "__main__":
     with app.app_context():

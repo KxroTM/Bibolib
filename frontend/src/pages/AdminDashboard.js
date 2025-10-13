@@ -458,7 +458,6 @@ const AdminDashboard = () => {
       // Recharger les données pour mettre à jour l'affichage
       loadData();
     } catch (error) {
-      console.error('Erreur lors de la modification de la sanction:', error);
       toast.error(`Erreur lors de la ${action === 'sanctionner' ? 'sanction' : 'réactivation'}`);
     }
   };
@@ -479,14 +478,31 @@ const AdminDashboard = () => {
         await adminService.removeRoleFromUser(userId, roleId);
         toast.success('Rôle retiré');
       }
+      
       // Recharger les données pour avoir les rôles à jour
       await loadAdmins();
       
-      // Mettre à jour selectedUser avec les nouvelles données
+      // Récupérer directement les données utilisateur fraîches depuis l'API
       if (selectedUser) {
-        const updatedUser = admins.find(u => u.id === selectedUser.id);
-        if (updatedUser) {
-          setSelectedUser(updatedUser);
+        try {
+          const userResponse = await adminService.getUsers({ 
+            page: 1, 
+            limit: 1000, 
+            q: selectedUser.username || selectedUser.email 
+          });
+          
+          let updatedUser = null;
+          if (userResponse.data && Array.isArray(userResponse.data.users)) {
+            updatedUser = userResponse.data.users.find(u => u.id === selectedUser.id);
+          } else if (Array.isArray(userResponse.data)) {
+            updatedUser = userResponse.data.find(u => u.id === selectedUser.id);
+          }
+          
+          if (updatedUser) {
+            setSelectedUser(updatedUser);
+          }
+        } catch (error) {
+          // Erreur lors de la récupération des données utilisateur
         }
       }
     } catch (error) {
@@ -533,10 +549,7 @@ const AdminDashboard = () => {
             </p>
           </div>
           <div>
-            <Link to="/admin/logs" className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm text-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h3V6a1 1 0 112 0v4h3a1 1 0 110 2H8v4a1 1 0 11-2 0v-4H3a1 1 0 01-1-1z"/></svg>
-              Voir les logs
-            </Link>
+            {/* Bouton logs déplacé dans la navbar */}
           </div>
         </div>
       </div>
@@ -967,7 +980,12 @@ const AdminDashboard = () => {
                           type="checkbox"
                           checked={hasRole}
                           onChange={(e) => handleRoleChange(selectedUser.id, role.id || role.name, e.target.checked ? 'add' : 'remove')}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-2 border-gray-300 rounded cursor-pointer"
+                          style={{ 
+                            accentColor: hasRole ? '#3B82F6' : undefined,
+                            transform: 'scale(1.1)',
+                            borderWidth: '2px'
+                          }}
                         />
                         <div>
                           <div className="text-sm font-medium text-gray-900">{role.name}</div>

@@ -19,10 +19,8 @@ const ProtectedRoute = ({ children, permission }) => {
 
   if (devBypass) {
     // Afficher la page en mode développement sans authentification
-    // NOTE: ce contournement est volontairement simple pour debug local
+    // NOTE: ce contournement est volontairement simple pour développement local
     // et ne doit PAS être utilisé en production.
-    // Afficher un avertissement dans la console pour rappeler l'usage local.
-    // eslint-disable-next-line no-console
     
     return children;
   }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -53,8 +52,6 @@ func initMongo() {
 
 	mongoClient = client
 	logCollection = client.Database(dbName).Collection(collectionName)
-
-	fmt.Println("✅ Connexion MongoDB réussie")
 }
 
 // -------------------------
@@ -108,6 +105,22 @@ func InsertLogRole(ctx context.Context, userID int, NewRoles, OldRoles []string,
 	return err
 }
 
+func InsertLogAccount(ctx context.Context, userID int, username, email, module, action, status, ip string) error {
+	logDoc := bson.M{
+		"user_id":   userID,
+		"username":  username,
+		"email":     email,
+		"module":    module,
+		"action":    action,
+		"ip":        ip,
+		"timestamp": time.Now(),
+		"status":    status,
+	}
+
+	_, err := logCollection.InsertOne(ctx, logDoc)
+	return err
+}
+
 // -------------------------
 // MAIN
 // -------------------------
@@ -132,13 +145,14 @@ func main() {
 		user := struct {
 			UserID   int    `json:"user_id"`
 			Username string `json:"username"`
+			Email    string `json:"email"`
 			IP       string `json:"ip"`
 		}{}
 		if err := c.ShouldBindJSON(&user); err != nil {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := CreateAccount(ctx, user.UserID, user.Username, user.IP)
+		err := CreateAccount(ctx, user.UserID, user.Username, user.Email, user.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return
@@ -151,13 +165,14 @@ func main() {
 		user := struct {
 			UserID   int    `json:"user_id"`
 			Username string `json:"username"`
+			Email    string `json:"email"`
 			IP       string `json:"ip"`
 		}{}
 		if err := c.ShouldBindJSON(&user); err != nil {
 			c.JSON(400, gin.H{"error": "Données invalides"})
 			return
 		}
-		err := UserDeleteAccount(ctx, user.UserID, user.Username, user.IP)
+		err := UserDeleteAccount(ctx, user.UserID, user.Username, user.Email, user.IP)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Impossible d'insérer le log"})
 			return

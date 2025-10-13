@@ -69,7 +69,9 @@ const AdminLogsPage = () => {
     { label: 'Connexions', action: () => setQuickFilter({ module: 'auth' }) },
     { label: 'Livres', action: () => setQuickFilter({ module: 'books' }) },
     { label: 'Prêts', action: () => setQuickFilter({ module: 'loans' }) },
-    { label: 'Admin', action: () => setQuickFilter({ module: 'admin' }) }
+    { label: 'Admin', action: () => setQuickFilter({ module: 'admin' }) },
+    { label: 'Comptes', action: () => setQuickFilter({ module: 'account' }) },
+    { label: 'Rôles', action: () => setQuickFilter({ module: 'role' }) }
   ];
 
   useEffect(() => {
@@ -129,6 +131,10 @@ const AdminLogsPage = () => {
         return `${baseClasses} bg-yellow-100 text-yellow-800`;
       case 'loans':
         return `${baseClasses} bg-indigo-100 text-indigo-800`;
+      case 'account':
+        return `${baseClasses} bg-green-100 text-green-800`;
+      case 'role':
+        return `${baseClasses} bg-orange-100 text-orange-800`;
       default:
         return `${baseClasses} bg-gray-100 text-gray-800`;
     }
@@ -255,6 +261,8 @@ const AdminLogsPage = () => {
                   <option value="books">📚 books</option>
                   <option value="admin">⚙️ admin</option>
                   <option value="loans">📖 loans</option>
+                  <option value="account">👤 account</option>
+                  <option value="role">🏷️ role</option>
                 </select>
               </div>
 
