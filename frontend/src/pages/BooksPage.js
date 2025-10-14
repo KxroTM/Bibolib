@@ -184,28 +184,65 @@ const BooksPage = () => {
       >
         <div className="absolute inset-0 bg-black bg-opacity-50"></div>
         <div className="relative z-10 container mx-auto px-4 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold mb-1">
-                Tous les Livres
-              </h1>
-              <p className="text-gray-200">
-                Découvrez tous les livres disponibles dans nos bibliothèques (titres uniques).
-              </p>
-              <p className="text-gray-300 text-sm mt-2">
-                {allBooks.length > 0 && `${allBooks.length} livres uniques • Page ${currentPage} sur ${totalPages}`}
-              </p>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="md:flex-1">
+                <h1 className="text-3xl md:text-4xl font-bold mb-1">
+                  Tous les Livres
+                </h1>
+                <p className="text-gray-200">
+                  Découvrez tous les livres disponibles dans nos bibliothèques (titres uniques).
+                </p>
+                <p className="text-gray-300 text-sm mt-2">
+                  {allBooks.length > 0 && `${allBooks.length} livres uniques • Page ${currentPage} sur ${totalPages}`}
+                </p>
+              </div>
+
+              {/* Search: placed to the right on md+ and full width under on mobile */}
+              <div className="md:w-1/2 w-full">
+                <form onSubmit={onBooksSearch} className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔎</span>
+                    <input
+                      className="w-full pl-10 pr-4 py-2 rounded-full border border-white bg-white bg-opacity-90 text-gray-900 shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      placeholder="Rechercher par titre, auteur, genre ou ISBN..."
+                      value={booksQuery}
+                      onChange={e=>setBooksQuery(e.target.value)}
+                    />
+                  </div>
+                  <button type="submit" className="px-4 py-2 rounded-full bg-primary-600 text-white text-sm font-medium shadow">Rechercher</button>
+                  <button
+                    type="button"
+                    onClick={()=>{ setBooksQuery(''); setCurrentPage(1); }}
+                    aria-label="Réinitialiser la recherche"
+                    title="Effacer"
+                    className="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                  >
+                    ✕
+                  </button>
+                </form>
+              </div>
             </div>
-          </div>
         </div>
       </div>
 
       <div>
-        <div className="mb-6">
-          <form onSubmit={onBooksSearch} className="flex gap-2">
-            <input className="input flex-1" placeholder="Rechercher par titre, auteur, genre ou ISBN..." value={booksQuery} onChange={e=>setBooksQuery(e.target.value)} />
-            <button className="btn" type="submit">Rechercher</button>
-            <button type="button" className="btn" onClick={()=>{ setBooksQuery(''); setCurrentPage(1); }}>Réinitialiser</button>
+        {/* On smaller screens, keep a visible search block below header (duplicate but responsive) */}
+        <div className="mb-6 md:hidden">
+          <form onSubmit={onBooksSearch} className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔎</span>
+              <input className="w-full pl-10 pr-4 py-2 rounded-full border border-gray-200 shadow-sm" placeholder="Rechercher par titre, auteur, genre ou ISBN..." value={booksQuery} onChange={e=>setBooksQuery(e.target.value)} />
+            </div>
+            <button className="px-4 py-2 rounded-full bg-primary-600 text-white text-sm" type="submit">Rechercher</button>
+            <button
+              type="button"
+              onClick={()=>{ setBooksQuery(''); setCurrentPage(1); }}
+              aria-label="Réinitialiser la recherche"
+              title="Effacer"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+            >
+              ✕
+            </button>
           </form>
         </div>
         {books.length === 0 ? (

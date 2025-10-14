@@ -91,7 +91,7 @@ const Footer = () => {
 				</div>
 
 				<div className="mt-6 pt-4 border-t text-xs text-gray-500 text-center">
-					© {new Date().getFullYear()} Bibliothèque numérique — Tous droits réservés • Conçu par Youssef Giovanni Elias Ilyes
+					© {new Date().getFullYear()} Bibliothèque numérique — Tous droits réservés • Conçu par Youssef Giovanni Ilyes
 				</div>
 			</div>
 		</footer>

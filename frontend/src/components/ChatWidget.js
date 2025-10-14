@@ -1,23 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 const PREDEFINED_QUESTIONS = [
-  "Quels sont les horaires d'ouverture ?",
   'Comment réserver un livre ?',
-  'Où se trouve la bibliothèque la plus proche ?',
   'Comment créer un compte ?',
   'Quel est le statut de ma réservation ?'
 ];
 
 function botReplyFor(text) {
   const t = String(text || '').toLowerCase();
-  if (t.includes('horaire') || t.includes("ouverture")) {
-    return "Les bibliothèques sont généralement ouvertes du mardi au dimanche de 10h à 18h. Certaines ont des horaires étendus le soir — vérifiez la page de la bibliothèque.";
-  }
+  
   if (t.includes('réserv') || t.includes('reserver') || t.includes('réserver')) {
     return "Pour réserver un livre : connectez-vous, ouvrez la fiche du livre et cliquez sur 'Réserver'. Vous recevrez une confirmation par e-mail si la réservation est acceptée.";
-  }
-  if (t.includes('proche') || t.includes('plus proche') || t.includes('où se trouve')) {
-    return "Consultez la page Bibliothèques : elle contient les adresses et coordonnées pour trouver la bibliothèque la plus proche.";
   }
   if (t.includes('compte') || t.includes('créer') || t.includes('inscription')) {
     return "Pour créer un compte : allez sur la page d'inscription, remplissez le formulaire et validez. Vous pourrez ensuite réserver et gérer vos emprunts.";

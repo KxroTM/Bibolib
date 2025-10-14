@@ -22,6 +22,7 @@ import MyLoansPage from './pages/MyLoansPage';
 import FaqPage from './pages/FaqPage';
 import ContactPage from './pages/ContactPage';
 import ConditionsPage from './pages/ConditionsPage';
+import FavoritesPage from './pages/FavoritesPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -62,6 +63,10 @@ function AppContent() {
           <Route
             path="/bibliotheques"
             element={<LibrariesPage />}
+          />
+          <Route
+            path="/favoris"
+            element={<FavoritesPage />}
           />
           {/* Ancienne route conservée avec redirection propre */}
           <Route

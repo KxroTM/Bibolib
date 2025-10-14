@@ -90,11 +90,27 @@ const LibrariesPage = () => {
         <p className="text-xl text-gray-600">
           Découvrez toutes les bibliothèques parisiennes et leurs collections
         </p>
-        <div className="mt-6 max-w-lg mx-auto">
-          <form onSubmit={onLibrariesSearch} className="flex gap-2">
-            <input className="input flex-1" placeholder="Rechercher une bibliothèque (nom, adresse)..." value={librariesQuery} onChange={e=>setLibrariesQuery(e.target.value)} />
-            <button className="btn" type="submit">Rechercher</button>
-            <button type="button" className="btn" onClick={()=>{ setLibrariesQuery(''); setCurrentPage(1); loadLibraries(); }}>Réinitialiser</button>
+        <div className="mt-6 max-w-lg mx-auto w-full px-4">
+          <form onSubmit={onLibrariesSearch} className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
+              <input
+                className="w-full pl-10 pr-4 py-2 rounded-full border border-gray-200 bg-white shadow-sm placeholder-gray-400"
+                placeholder="Rechercher une bibliothèque (nom, adresse)..."
+                value={librariesQuery}
+                onChange={e=>setLibrariesQuery(e.target.value)}
+              />
+            </div>
+            <button className="px-4 py-2 rounded-full bg-primary-600 text-white text-sm font-medium shadow" type="submit">Rechercher</button>
+            <button
+              type="button"
+              onClick={()=>{ setLibrariesQuery(''); setCurrentPage(1); loadLibraries(); }}
+              aria-label="Réinitialiser la recherche"
+              title="Effacer"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+            >
+              ✕
+            </button>
           </form>
         </div>
       </div>

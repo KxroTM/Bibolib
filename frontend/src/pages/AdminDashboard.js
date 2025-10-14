@@ -642,18 +642,23 @@ const AdminDashboard = () => {
               {activeTab === 'books' && (
                 <div className="space-y-8">
                   <div className="flex items-center justify-between">
-                    <form onSubmit={onBookSearch} className="flex items-center gap-2 mb-4">
-                      <input className="input" placeholder="Rechercher un livre..." value={bookQuery} onChange={e=>setBookQuery(e.target.value)} />
-                      <button className="btn" type="submit">Rechercher</button>
-                      <button type="button" className="btn" onClick={()=>{ setBookQuery(''); setCurrentPage(1); loadBooks(); }}>Réinitialiser</button>
+                    <form onSubmit={onBookSearch} className="flex items-center gap-2 mb-4 md:flex-1">
+                      <div className="relative flex-1 md:max-w-xl">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔎</span>
+                        <input className="w-full pl-10 pr-4 py-2 rounded-full border border-gray-200 shadow-sm" placeholder="Rechercher un livre..." value={bookQuery} onChange={e=>setBookQuery(e.target.value)} />
+                      </div>
+                      <button className="px-4 py-2 rounded-full bg-primary-600 text-white text-sm font-medium shadow" type="submit">Rechercher</button>
+                      <button type="button" aria-label="Réinitialiser la recherche" title="Effacer" className="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-gray-50" onClick={()=>{ setBookQuery(''); setCurrentPage(1); loadBooks(); }}>✕</button>
                     </form>
-                    {hasPermission('BOOK_CREATE') && (
-                      <button 
-                        className="btn btn-primary"
-                        onClick={openBookModal}
-                      >
-                        Créer un livre
-                      </button>
+                    {hasPermission('BOOKCreate') && (
+                      <div className="ml-4">
+                        <button 
+                          className="btn btn-primary"
+                          onClick={openBookModal}
+                        >
+                          Créer un livre
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -736,18 +741,23 @@ const AdminDashboard = () => {
               {activeTab === 'libraries' && (
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <form onSubmit={onLibrarySearch} className="flex items-center gap-2 mb-4">
-                      <input className="input" placeholder="Rechercher une bibliothèque..." value={libraryQuery} onChange={e=>setLibraryQuery(e.target.value)} />
-                      <button className="btn" type="submit">Rechercher</button>
-                      <button type="button" className="btn" onClick={()=>{ setLibraryQuery(''); loadLibraries(); }}>Réinitialiser</button>
+                    <form onSubmit={onLibrarySearch} className="flex items-center gap-2 mb-4 md:flex-1">
+                      <div className="relative flex-1 md:max-w-lg">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
+                        <input className="w-full pl-10 pr-4 py-2 rounded-full border border-gray-200 shadow-sm" placeholder="Rechercher une bibliothèque..." value={libraryQuery} onChange={e=>setLibraryQuery(e.target.value)} />
+                      </div>
+                      <button className="px-4 py-2 rounded-full bg-primary-600 text-white text-sm font-medium shadow" type="submit">Rechercher</button>
+                      <button type="button" aria-label="Réinitialiser la recherche" title="Effacer" className="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-gray-50" onClick={()=>{ setLibraryQuery(''); loadLibraries(); }}>✕</button>
                     </form>
                     {hasPermission('LIBRARY_CREATE') && (
-                      <button 
-                        className="btn btn-primary"
-                        onClick={() => setShowLibraryModal(true)}
-                      >
-                        Créer une bibliothèque
-                      </button>
+                      <div className="ml-4">
+                        <button 
+                          className="btn btn-primary"
+                          onClick={() => setShowLibraryModal(true)}
+                        >
+                          Créer une bibliothèque
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -790,8 +800,11 @@ const AdminDashboard = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <form onSubmit={onUserSearch} className="flex items-center gap-2">
-                        <input className="input" placeholder="Rechercher un utilisateur..." value={userQuery} onChange={e=>setUserQuery(e.target.value)} />
-                        <button className="btn" type="submit">Rechercher</button>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔎</span>
+                          <input className="pl-10 pr-4 py-2 rounded-full border border-gray-200 shadow-sm" placeholder="Rechercher un utilisateur..." value={userQuery} onChange={e=>setUserQuery(e.target.value)} />
+                        </div>
+                        <button className="px-4 py-2 rounded-full bg-primary-600 text-white text-sm font-medium" type="submit">Rechercher</button>
                       </form>
                       <select className="input" value={roleFilter} onChange={onRoleFilterChange}>
                         <option value="">Tous les rôles</option>

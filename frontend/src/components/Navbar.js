@@ -56,6 +56,10 @@ const Navbar = () => {
                 <span className="text-sm font-medium">🏛️</span>
                 <span className="text-sm">Bibliothèques</span>
               </Link>
+              <Link to="/favoris" className="px-3 py-1 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors flex items-center space-x-2">
+                <span className="text-sm font-medium">💖</span>
+                <span className="text-sm">Favoris</span>
+              </Link>
               {user && (
                 <Link to="/mes-emprunts" className="px-3 py-1 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors flex items-center space-x-2">
                   <span className="text-sm font-medium">📚</span>

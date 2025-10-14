@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getLibraryBackground } from '../utils/libraryBackgrounds';
+import imgBibliotheque from '../utils/img_bibliotheque';
 import ImageLightbox from './ImageLightbox';
 
 const NewBooksCarousel = ({ books = [], autoInterval = 4000 }) => {
@@ -35,13 +36,13 @@ const NewBooksCarousel = ({ books = [], autoInterval = 4000 }) => {
   if (!books || books.length === 0) return null;
 
   const book = books[index];
-  const backgroundUrl = index === 0
-    ? 'https://cdn.paris.fr/paris/2023/08/29/huge-bccf1b019a55e1e21c17371dd1a6482a.jpg'
-    : index === 1
-      ? 'https://img.lemde.fr/2024/08/29/446/0/1217/608/1342/671/60/0/76939b3_347143-3387184.jpg'
-      : index === 3
-        ? 'https://images.lecho.be/view?iid=dc:78610730&context=ONLINE&ratio=16/9&width=1280&u=1491223800000'
-        : getLibraryBackground(book.libraryId || 1);
+  // Prefer images provided by the user to avoid repeating the same cover
+  const fallbackImage = getLibraryBackground(book.libraryId || 1);
+  const imageFromList = imgBibliotheque && imgBibliotheque.length > 0
+    ? imgBibliotheque[index % imgBibliotheque.length]
+    : fallbackImage;
+
+  const backgroundUrl = imageFromList || fallbackImage;
 
   return (
     <div
@@ -80,8 +81,8 @@ const NewBooksCarousel = ({ books = [], autoInterval = 4000 }) => {
               tabIndex={0}
               className="w-48 h-64 bg-gray-100 rounded overflow-hidden shadow-lg transform -translate-x-2 rotate-6 hover:translate-x-0 hover:rotate-2 hover:scale-105 hover:shadow-2xl transition-all duration-300 cursor-pointer origin-center"
             >
-              {book.coverImage ? (
-                <img src={book.coverImage} alt={book.title} className="w-full h-full object-cover" />
+              {(book.coverImage || imageFromList) ? (
+                <img src={book.coverImage || imageFromList} alt={book.title} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-5xl">📖</div>
               )}
