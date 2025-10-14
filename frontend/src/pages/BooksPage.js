@@ -41,7 +41,7 @@ const BooksPage = () => {
       // Récupérer TOUS les livres d'abord (sans pagination côté serveur)
       const response = await bookService.getAll({
         page: 1,
-        limit: 1000 // Récupérer beaucoup de livres d'un coup
+        limit: 10000 // Récupérer beaucoup de livres d'un coup
       });
       
       

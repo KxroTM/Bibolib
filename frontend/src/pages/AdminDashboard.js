@@ -47,7 +47,7 @@ const AdminDashboard = () => {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const itemsPerPage = 1000; // Limite très élevée pour afficher tous les livres
+  const itemsPerPage = 10000; // Limite très élevée pour afficher tous les livres
 
   const readOnly = false;
 

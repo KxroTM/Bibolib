@@ -83,7 +83,7 @@ const BookDetailPage = () => {
       
       // Récupérer tous les livres avec le même titre
       const response = await bookService.getAll({
-        limit: 1000 // Récupérer beaucoup de livres pour être sûr d'avoir tous les exemplaires
+        limit: 10000 // Récupérer beaucoup de livres pour être sûr d'avoir tous les exemplaires
       });
       
       let allBooks = [];
