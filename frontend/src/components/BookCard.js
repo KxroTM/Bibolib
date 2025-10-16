@@ -2,9 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { isFavorited, toggleFavorite } from '../utils/favorites';
 import { toast } from 'react-toastify';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const BookCard = ({ book, showLibrary = false }) => {
   const [fav, setFav] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     setFav(isFavorited(book.id));
@@ -16,6 +21,13 @@ const BookCard = ({ book, showLibrary = false }) => {
   const handleToggle = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    // require login
+    if (!user) {
+      toast.info('Veuillez vous connecter pour ajouter des favoris');
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
+
     const res = toggleFavorite(book.id);
     if (res.success) {
       setFav(res.favorited);
