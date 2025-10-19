@@ -38,6 +38,8 @@ const AdminLogsPage = () => {
   };
 
   const getDisplayUser = (l) => {
+    // Si c'est un log du cron, afficher Système
+    if (l?.module === 'cron') return 'Système';
     const val =
       coerceToString(l?.username) ||
       coerceToString(l?.user) ||
@@ -50,6 +52,7 @@ const AdminLogsPage = () => {
   };
 
   const getUserInitial = (l) => {
+    if (l?.module === 'cron') return 'S';
     const name = getDisplayUser(l);
     return name && name.length ? name.charAt(0).toUpperCase() : '?';
   };
@@ -71,7 +74,8 @@ const AdminLogsPage = () => {
     { label: 'Prêts', action: () => setQuickFilter({ module: 'loans' }) },
     { label: 'Admin', action: () => setQuickFilter({ module: 'admin' }) },
     { label: 'Comptes', action: () => setQuickFilter({ module: 'account' }) },
-    { label: 'Rôles', action: () => setQuickFilter({ module: 'role' }) }
+    { label: 'Rôles', action: () => setQuickFilter({ module: 'role' }) },
+    { label: 'Cron', action: () => setQuickFilter({ module: 'cron' }) }
   ];
 
   useEffect(() => {
@@ -135,6 +139,8 @@ const AdminLogsPage = () => {
         return `${baseClasses} bg-green-100 text-green-800`;
       case 'role':
         return `${baseClasses} bg-orange-100 text-orange-800`;
+      case 'cron':
+        return `${baseClasses} bg-red-200 text-red-900 border border-red-400`;
       default:
         return `${baseClasses} bg-gray-100 text-gray-800`;
     }
@@ -263,6 +269,7 @@ const AdminLogsPage = () => {
                   <option value="loans">📖 loans</option>
                   <option value="account">👤 account</option>
                   <option value="role">🏷️ role</option>
+                  <option value="cron">⏰ cron</option>
                 </select>
               </div>
 

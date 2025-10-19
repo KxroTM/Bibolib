@@ -121,10 +121,29 @@ func InsertLogAccount(ctx context.Context, userID int, username, email, module, 
 	return err
 }
 
+func InsertCronLog(ctx context.Context, details map[string]interface{}) error {
+	logDoc := bson.M{
+		"module":    "cron",
+		"action":    "PURGE_RESERVATIONS",
+		"timestamp": time.Now(),
+		"status":    details["status"],
+		"count":     details["count"],
+		"details":   details["details"],
+	}
+	for k, v := range details {
+		if _, exists := logDoc[k]; !exists {
+			logDoc[k] = v
+		}
+	}
+	_, err := logCollection.InsertOne(ctx, logDoc)
+	return err
+}
+
 // -------------------------
 // MAIN
 // -------------------------
 func main() {
+
 	// Init MongoDB
 	initMongo()
 
@@ -1176,6 +1195,35 @@ func main() {
 			"total_pages": (total + int64(limitInt) - 1) / int64(limitInt),
 		})
 	})
-
+	r.POST("/cron/purge-reservations", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		type CronLog struct {
+			Status  string                 `json:"status"`
+			Count   int                    `json:"count"`
+			Details string                 `json:"details"`
+			Meta    map[string]interface{} `json:"meta"`
+		}
+		var logData CronLog
+		if err := c.ShouldBindJSON(&logData); err != nil {
+			c.JSON(400, gin.H{"error": "Données invalides"})
+			return
+		}
+		// Fusionne meta dans le log principal
+		logMap := map[string]interface{}{
+			"status":  logData.Status,
+			"count":   logData.Count,
+			"details": logData.Details,
+		}
+		for k, v := range logData.Meta {
+			logMap[k] = v
+		}
+		err := InsertCronLog(ctx, logMap)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Impossible d'insérer le log cron"})
+			return
+		}
+		c.JSON(200, gin.H{"message": "Cron log inséré"})
+	})
 	r.Run(":8080")
 }
