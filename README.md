@@ -1,4 +1,4 @@
-# 📚 Bibliothèque numérique - Système de Gestion de Bibliothèques
+# 📚 Bibliothèque numérique – Système de gestion de bibliothèques
 
 Bibliothèque numérique est une application complète de gestion de bibliothèques développée avec une architecture microservices utilisant React, Flask, Go et MySQL.
 
@@ -7,7 +7,7 @@ Bibliothèque numérique est une application complète de gestion de bibliothèq
 - **Frontend** : React.js (port 3000)
 - **Backend API** : Flask/Python (port 5000)
 - **Base de données** : MySQL 8.0 (port 3307)
-- **Logs d'activité** : Go/Gin (port 8080)
+- **Logs d’activité** : Go/Gin (port 8080)
 - **Base de données logs** : MongoDB (cloud)
 
 ## 📋 Prérequis
@@ -15,7 +15,7 @@ Bibliothèque numérique est une application complète de gestion de bibliothèq
 - [Docker](https://www.docker.com/get-started) et Docker Compose installés
 - Git pour cloner le projet
 
-## 🚀 Installation et Démarrage
+## 🚀 Installation et démarrage
 
 ### 1. Cloner le projet
 
@@ -40,18 +40,18 @@ docker-compose up -d
 docker-compose ps
 ```
 
-Vous devriez voir 4 conteneurs en cours d'exécution :
+Vous devriez voir 4 conteneurs en cours d’exécution :
 
 - `bibolib-mysql` (healthy)
 - `bibolib-backend-1` (up)
 - `bibolib-frontend-1` (up)
 - `bibolib-activity_logs-1` (up)
 
-## 🌐 Accès aux Services
+## 🌐 Accès aux services
 
-- **Application Web** : http://localhost:3000
-- **API Backend** : http://localhost:5000
-- **Service de Logs** : http://localhost:8080
+- **Application web** : http://localhost:3000
+- **API backend** : http://localhost:5000
+- **Service de logs** : http://localhost:8080
 - **Base de données MySQL** : localhost:3307
 
 ## 🔁 Mise à jour après modification du code
