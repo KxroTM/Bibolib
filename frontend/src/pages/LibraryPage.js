@@ -158,7 +158,7 @@ const LibraryPage = () => {
     }
   };
 
-  const handleSearch = async (query) => {
+  const handleSearch = React.useCallback(async (query) => {
     if (!query) {
       setFilteredBooks(books);
       return;
@@ -166,25 +166,16 @@ const LibraryPage = () => {
 
     try {
       setSearching(true);
-      
       const response = await libraryService.searchBooks(id, query);
-      
-      // Traiter la réponse exactement comme pour les bibliothèques
       const responseData = response.data;
       let searchResults = [];
-      
       if (responseData && Array.isArray(responseData.books)) {
-        // Nouveau format avec pagination
         searchResults = responseData.books;
       } else if (Array.isArray(responseData)) {
-        // Ancien format tableau simple
         searchResults = responseData;
       }
-      
       setFilteredBooks(searchResults);
     } catch (error) {
-      
-      // Recherche locale en cas d'erreur
       const filtered = books.filter(book =>
         book.title.toLowerCase().includes(query.toLowerCase()) ||
         book.author.toLowerCase().includes(query.toLowerCase())
@@ -193,7 +184,7 @@ const LibraryPage = () => {
     } finally {
       setSearching(false);
     }
-  };
+  }, [books, id]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);

@@ -1,22 +1,52 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
-const SearchBar = ({ onSearch, placeholder = "Rechercher un livre...", className = "" }) => {
+const SearchBar = ({ onSearch, placeholder = "Rechercher un livre...", className = "", debounceTime = 500 }) => {
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const timerRef = useRef(null);
+  const lastQueryRef = useRef('');
+  const mountedRef = useRef(false);
 
-  // Debounce pour optimiser les recherches
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (query.trim()) {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  // Robust debounce: only call onSearch when the user stopped typing for debounceTime
+  // and when the trimmed query actually changed since last call.
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    timerRef.current = setTimeout(() => {
+      const trimmed = query.trim();
+
+      // Avoid duplicate calls for the same query
+      if (trimmed === lastQueryRef.current) return;
+
+      lastQueryRef.current = trimmed;
+
+      if (trimmed) {
         setIsSearching(true);
-        onSearch(query.trim()).finally(() => setIsSearching(false));
+        // if onSearch returns a promise, keep spinner until it resolves
+        const maybePromise = onSearch(trimmed);
+        if (maybePromise && typeof maybePromise.finally === 'function') {
+          maybePromise.finally(() => { if (mountedRef.current) setIsSearching(false); });
+        } else {
+          if (mountedRef.current) setIsSearching(false);
+        }
       } else {
+        // cleared search
         onSearch('');
       }
-    }, 300);
+    }, debounceTime);
 
-    return () => clearTimeout(timer);
-  }, [query, onSearch]);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [query, onSearch, debounceTime]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
