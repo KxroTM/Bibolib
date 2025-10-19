@@ -7,8 +7,13 @@ Bibliothèque numérique est une application complète de gestion de bibliothèq
 - **Frontend** : React.js (port 3000)
 - **Backend API** : Flask/Python (port 5000)
 - **Base de données** : MySQL 8.0 (port 3307)
+- **Cron de purge** : Script Python (purge automatique des réservations expirées, toutes les 4h)
 - **Logs d’activité** : Go/Gin (port 8080)
 - **Base de données logs** : MongoDB (cloud)
+
+## ⏰ Cron de purge automatique
+
+Un service cron dédié exécute automatiquement la purge des réservations expirées toutes les 4 heures. Ce service fonctionne en tâche de fond dans un conteneur séparé et enregistre chaque action dans les logs d’activité (module "cron").
 
 ## 📋 Prérequis
 
@@ -42,10 +47,10 @@ docker-compose ps
 
 Vous devriez voir 4 conteneurs en cours d’exécution :
 
-- `bibolib-mysql` (healthy)
-- `bibolib-backend-1` (up)
-- `bibolib-frontend-1` (up)
-- `bibolib-activity_logs-1` (up)
+    - `bibolib-mysql` (healthy)
+    - `bibolib-backend-1` (up)
+    - `bibolib-frontend-1` (up)
+    - `bibolib-activity_logs-1` (up)
 
 ## 🌐 Accès aux services
 
