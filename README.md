@@ -77,7 +77,7 @@ docker-compose down -v
 docker-compose up -d --build
 ```
 
-# Shema ##
+# Schéma ##
 
 Voici le schéma de la base de données utilisé par l'application :
 
