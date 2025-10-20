@@ -81,3 +81,11 @@ docker-compose logs -f backend
 docker-compose down -v
 docker-compose up -d --build
 ```
+
+# Schéma ##
+
+Voici le schéma de la base de données utilisé par l'application :
+
+![Schéma de la base de données](image.png)
+
+
