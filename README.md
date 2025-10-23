@@ -28,6 +28,7 @@ Un service cron dédié exécute automatiquement la purge des réservations expi
 git clone https://github.com/KxroTM/Bibolib.git
 cd Bibolib
 ```
+Penser à changer remplir les informations du fichier .env
 
 ### 2. Démarrer tous les services
 
